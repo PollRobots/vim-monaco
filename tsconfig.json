@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "target": "ES2022",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "jsx": "react",
+    "allowSyntheticDefaultImports": true,
+    "lib": ["dom", "ES2022"],
+    "declaration": true
+  },
+
+}
