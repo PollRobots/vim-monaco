@@ -1,11 +1,13 @@
 import monaco from "monaco-editor";
-import { IStatusBar as IStatusBarInternal, StatusBar } from "./statusbar";
+import * as StatusBar from "./statusbar";
 import EditorAdapter from "./adapter";
 import { initVimAdapter, vimApi } from "./keymap_vim";
-import { IRegister as IRegisterInternal } from "./register-controller";
+import * as Registers from "./register-controller";
 
-export type IRegister = IRegisterInternal;
-export type IStatusBar = IStatusBarInternal;
+export type IRegister = Registers.IRegister;
+export type IStatusBar = StatusBar.IStatusBar;
+export type ModeChangeEvent = StatusBar.ModeChangeEvent;
+export type SecInfoOptions = StatusBar.SecInfoOptions;
 
 declare global {
   interface Window {
@@ -17,7 +19,7 @@ export const makeDomStatusBar = (
   parent: HTMLElement,
   setFocus?: () => void
 ): IStatusBar => {
-  return new StatusBar(parent, setFocus);
+  return new StatusBar.StatusBar(parent, setFocus);
 };
 
 interface SetOptionConfig {
