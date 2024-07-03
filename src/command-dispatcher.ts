@@ -14,15 +14,11 @@ import { actions } from "./actions";
 import { operators } from "./operators";
 import { InputState } from "./input-state";
 import {
-  KeyMapping,
-  Context,
   commandMatches,
   lastChar,
-  VimState,
   copyArgs,
   clearInputState,
   updateCmSelection,
-  vimGlobalState,
   updateSearchQuery,
   showConfirm,
   logSearchQuery,
@@ -42,6 +38,8 @@ import {
   exitVisualMode,
 } from "./keymap_vim";
 import { getSearchState } from "./search";
+import { vimGlobalState } from "./global";
+import { KeyMapping, Context, VimState } from "./types";
 
 export class CommandDispatcher {
   matchCommand(
@@ -57,13 +55,8 @@ export class CommandDispatcher {
       return { type: "partial" };
     }
 
-    let bestMatch;
-    for (let i = 0; i < matches.full.length; i++) {
-      const match = matches.full[i];
-      if (!bestMatch) {
-        bestMatch = match;
-      }
-    }
+    const bestMatch = matches.full![0];
+
     if (bestMatch.keys.endsWith("<character>")) {
       const character = lastChar(keys);
       if (!character) return { type: "none" };
@@ -176,11 +169,11 @@ export class CommandDispatcher {
     actionArgs.repeatIsExplicit = repeatIsExplicit;
     actionArgs.registerName = inputState.registerName;
     clearInputState(adapter);
-    vim.lastMotion = null;
+    vim.lastMotion = undefined;
     if (command.isEdit) {
       this.recordLastEdit(vim, inputState, command);
     }
-    actions[command.action](adapter, actionArgs, vim);
+    actions[command.action!](adapter, actionArgs, vim);
   }
 
   processSearch(adapter: EditorAdapter, vim: VimState, command: KeyMapping) {
@@ -188,8 +181,8 @@ export class CommandDispatcher {
       // Search depends on SearchCursor.
       return;
     }
-    const forward = command.searchArgs.forward;
-    const wholeWordOnly = command.searchArgs.wholeWordOnly;
+    const forward = command.searchArgs!.forward;
+    const wholeWordOnly = command.searchArgs!.wholeWordOnly;
     getSearchState(adapter).setReversed(!forward);
     const promptPrefix = forward ? "/" : "?";
     const originalQuery = getSearchState(adapter).getQuery();
@@ -214,7 +207,7 @@ export class CommandDispatcher {
         motion: "findNext",
         motionArgs: {
           forward: true,
-          toJumplist: command.searchArgs.toJumplist,
+          toJumplist: command.searchArgs!.toJumplist,
         },
       });
     };
@@ -237,7 +230,7 @@ export class CommandDispatcher {
       if (keyName == "Up" || keyName == "Down") {
         const target = e.target as HTMLInputElement;
         up = keyName == "Up" ? true : false;
-        offset = e.target ? target.selectionEnd : 0;
+        offset = e.target ? target.selectionEnd! : 0;
         query =
           vimGlobalState.searchHistoryController.nextMatch(query, up) || "";
         close(query);
@@ -256,7 +249,7 @@ export class CommandDispatcher {
         )
           vimGlobalState.searchHistoryController.reset();
       }
-      let parsedQuery: RegExp;
+      let parsedQuery: RegExp | undefined;
       try {
         parsedQuery = updateSearchQuery(
           adapter,
@@ -288,7 +281,7 @@ export class CommandDispatcher {
       ) {
         vimGlobalState.searchHistoryController.pushInput(query);
         vimGlobalState.searchHistoryController.reset();
-        updateSearchQuery(adapter, originalQuery.source);
+        updateSearchQuery(adapter, originalQuery!.source);
         clearSearchHighlight(adapter);
         adapter.scrollTo(originalScrollPos.left, originalScrollPos.top);
         stopEvent(e);
@@ -304,11 +297,11 @@ export class CommandDispatcher {
       }
       return false;
     };
-    switch (command.searchArgs.querySrc) {
+    switch (command.searchArgs!.querySrc) {
       case "prompt":
         const macroModeState = vimGlobalState.macroModeState;
         if (macroModeState.isPlaying) {
-          const query = macroModeState.replaySearchQueries.shift();
+          const query = macroModeState.replaySearchQueries.shift()!;
           handleQuery(query, true /** ignoreCase */, false /** smartCase */);
         } else {
           showPrompt(adapter, {
@@ -422,7 +415,7 @@ export class CommandDispatcher {
     };
     if (command.type == "keyToEx") {
       // Handle user defined Ex to Ex mappings
-      exCommandDispatcher.processCommand(adapter, command.exArgs.input);
+      exCommandDispatcher.processCommand(adapter, command.exArgs!.input);
     } else {
       if (vim.visualMode) {
         showPrompt(adapter, {
@@ -464,8 +457,8 @@ export class CommandDispatcher {
     );
     const oldHead = copyCursor(origHead);
     const oldAnchor = copyCursor(origAnchor);
-    let newHead: Pos;
-    let newAnchor: Pos;
+    let newHead: Pos | undefined;
+    let newAnchor: Pos | undefined;
     if (operator) {
       this.recordLastEdit(vim, inputState);
     }
@@ -598,7 +591,7 @@ export class CommandDispatcher {
         // Init visual op
         curStart = cursorMin(sel.head, sel.anchor);
         curEnd = cursorMax(sel.head, sel.anchor);
-        linewise = vim.visualLine || operatorArgs.linewise;
+        linewise = !!(vim.visualLine || operatorArgs.linewise);
         mode = vim.visualBlock ? "block" : linewise ? "line" : "char";
         cmSel = makeCmSelection(
           adapter,
@@ -626,7 +619,7 @@ export class CommandDispatcher {
           curStart = curEnd;
           curEnd = tmp;
         }
-        linewise = motionArgs.linewise || operatorArgs.linewise;
+        linewise = !!(motionArgs.linewise || operatorArgs.linewise);
         if (linewise) {
           // Expand selection to entire line.
           expandSelectionToLine(adapter, curStart, curEnd);
@@ -644,7 +637,7 @@ export class CommandDispatcher {
         );
       }
       adapter.setSelections(cmSel.ranges, cmSel.primary);
-      vim.lastMotion = null;
+      vim.lastMotion = undefined;
       operatorArgs.repeat = repeat; // For indent in visual mode.
       operatorArgs.registerName = registerName;
       // Keep track of linewise as it affects how paste and change behave.
@@ -654,10 +647,10 @@ export class CommandDispatcher {
         operatorArgs,
         cmSel.ranges,
         oldAnchor,
-        newHead
+        newHead!
       );
       if (vim.visualMode) {
-        exitVisualMode(adapter, operatorMoveTo != null);
+        exitVisualMode(adapter, !!operatorMoveTo);
       }
       if (operatorMoveTo) {
         adapter.setCursor(operatorMoveTo);

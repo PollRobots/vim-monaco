@@ -91,7 +91,7 @@ export class StringStream {
     pattern: string | RegExp,
     consume?: boolean,
     caseInsensitive?: boolean
-  ): string | boolean | RegExpMatchArray {
+  ): string | boolean | RegExpMatchArray | null {
     if (typeof pattern == "string") {
       const cased = (str: string) => {
         return caseInsensitive ? str.toLowerCase() : str;
@@ -103,9 +103,10 @@ export class StringStream {
         }
         return true;
       }
+      return null;
     } else {
       var match = this.str.slice(this.pos).match(pattern);
-      if (match && match.index > 0) {
+      if (match && match.index && match.index > 0) {
         return null;
       }
       if (match && consume !== false) {

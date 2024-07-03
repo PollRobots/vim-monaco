@@ -1,4 +1,4 @@
-import { OperatorArgs, MotionArgs } from "./keymap_vim";
+import { OperatorArgs, MotionArgs } from "./types";
 
 // Represents the current input state.
 
@@ -7,11 +7,11 @@ export class InputState {
   motionRepeat: string[] = [];
 
   operator?: string;
-  operatorArgs?: OperatorArgs = null;
-  motion?: string = null;
-  motionArgs?: MotionArgs = null;
+  operatorArgs?: OperatorArgs;
+  motion?: string;
+  motionArgs?: MotionArgs;
   keyBuffer: string = ""; // For matching multi-key commands.
-  registerName?: string = null; // Defaults to the unnamed register.
+  registerName?: string; // Defaults to the unnamed register.
   selectedCharacter?: string;
   repeatOverride?: number;
   operatorShortcut?: string;

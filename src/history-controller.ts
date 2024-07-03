@@ -1,7 +1,7 @@
 export class HistoryController {
   historyBuffer: string[] = [];
   iterator: number = 0;
-  initialPrefix?: string = null;
+  initialPrefix?: string = undefined;
 
   constructor() {}
 
@@ -9,7 +9,7 @@ export class HistoryController {
   // until we start autocompletion in which case it is the autocompleted.
   nextMatch(input: string, up: boolean) {
     const dir = up ? -1 : 1;
-    if (this.initialPrefix === null) {
+    if (this.initialPrefix === undefined) {
       this.initialPrefix = input;
     }
     let i = 0;
@@ -44,7 +44,7 @@ export class HistoryController {
   }
 
   reset() {
-    this.initialPrefix = null;
+    this.initialPrefix = undefined;
     this.iterator = this.historyBuffer.length;
   }
 }

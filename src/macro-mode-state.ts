@@ -1,16 +1,13 @@
 import EditorAdapter from "./adapter";
-import {
-  InsertModeChanges,
-  createInsertModeChanges,
-  vimGlobalState,
-} from "./keymap_vim";
+import { vimGlobalState } from "./global";
+import { InsertModeChanges, createInsertModeChanges } from "./keymap_vim";
 
 export class MacroModeState {
   latestRegister?: string = undefined;
   isPlaying = false;
   isRecording = false;
   replaySearchQueries: string[] = [];
-  onRecordingDone: () => void = undefined;
+  onRecordingDone?: () => void = undefined;
   lastInsertModeChanges: InsertModeChanges;
 
   constructor() {

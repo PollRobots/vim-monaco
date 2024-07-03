@@ -22,10 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
  */
 import EditorAdapter, {
+  BindingFunction,
   Change,
   CmSelection,
   KeyMapEntry,
-  Marker,
 } from "./adapter";
 import { StringStream } from "./string-stream";
 import { defaultKeymap } from "./default-key-map";
@@ -54,212 +54,28 @@ import {
   getOption,
   getOptionType,
   OptionConfig,
-  resetOptions,
   setOption,
 } from "./options";
 import { ExCommandDispatcher } from "./ex-command-dispatcher";
-import { CircularJumpList, createCircularJumpList } from "./jump-list";
 import { MacroModeState } from "./macro-mode-state";
 import { InputState } from "./input-state";
-import { Register, RegisterController } from "./register-controller";
-import { HistoryController } from "./history-controller";
-import { commandDispatcher, CommandDispatcher } from "./command-dispatcher";
+import { Register } from "./register-controller";
+import { commandDispatcher } from "./command-dispatcher";
 import { getSearchState, searchOverlay, SearchState } from "./search";
-
-type VimOptions = Record<string, { value?: string | number | boolean }>;
-
-interface LastSelection {
-  anchorMark: Marker;
-  headMark: Marker;
-  anchor: Pos;
-  head: Pos;
-  visualMode: boolean;
-  visualLine: boolean;
-  visualBlock: boolean;
-}
-
-export interface VimState {
-  inputState: InputState;
-  // Vim's input state that triggered the last edit, used to repeat
-  // motions and operators with '.'.
-  lastEditInputState?: InputState;
-  // Vim's action command before the last edit, used to repeat actions
-  // with '.' and insert mode repeat.
-  lastEditActionCommand?: KeyMapping;
-  // When using jk for navigation, if you move from a longer line to a
-  // shorter line, the cursor may clip to the end of the shorter line.
-  // If j is pressed again and cursor goes to the next line, the
-  // cursor should go back to its horizontal position on the longer
-  // line if it can. This is to keep track of the horizontal position.
-  lastHPos: number;
-  // Doing the same with screen-position for gj/gk
-  lastHSPos: number;
-  // The last motion command run. Cleared if a non-motion command gets
-  // executed in between.
-  lastMotion?: MotionFunc;
-  marks: Record<string, Marker>;
-  insertMode: boolean;
-  // Repeat count for changes made in insert mode, triggered by key
-  // sequences like 3,i. Only exists when insertMode is true.
-  insertModeRepeat?: number;
-  visualMode: boolean;
-  // If we are in visual line mode. No effect if visualMode is false.
-  visualLine: boolean;
-  visualBlock: boolean;
-  lastSelection?: LastSelection;
-  lastPastedText?: string;
-  sel?: CmSelection;
-  // Buffer-local/window-local values of vim options.
-  options: VimOptions;
-
-  searchState_?: SearchState;
-  exMode?: boolean;
-}
-
-interface VimGlobalState {
-  // The current search query.
-  searchQuery?: string;
-  // Whether we are searching backwards.
-  searchIsReversed: boolean;
-  // Replace part of the last substituted pattern
-  lastSubstituteReplacePart?: string;
-  jumpList: CircularJumpList;
-  macroModeState: MacroModeState;
-  // Recording latest f, t, F or T motion command.
-  lastCharacterSearch: {
-    increment: number;
-    forward: boolean;
-    selectedCharacter: string;
-  };
-  registerController: RegisterController;
-  // search history buffer
-  searchHistoryController: HistoryController;
-  // ex Command history buffer
-  exCommandHistoryController: HistoryController;
-  query?: RegExp;
-  isReversed?: boolean;
-}
-
-export interface MotionArgs {
-  linewise?: boolean;
-  toJumplist?: boolean;
-  forward?: boolean;
-  wordEnd?: boolean;
-  bigWord?: boolean;
-  inclusive?: boolean;
-  explicitRepeat?: boolean;
-  toFirstChar?: boolean;
-  repeatOffset?: number;
-  sameLine?: boolean;
-  textObjectInner?: boolean;
-  selectedCharacter?: string;
-  repeatIsExplicit?: boolean;
-  noRepeat?: boolean;
-  repeat?: number;
-}
-
-export interface ActionArgs {
-  after?: boolean;
-  isEdit?: boolean;
-  matchIndent?: boolean;
-  forward?: boolean;
-  linewise?: boolean;
-  insertAt?: string;
-  blockwise?: boolean;
-  keepSpaces?: boolean;
-  replace?: boolean;
-  position?: "center" | "top" | "bottom";
-  increase?: boolean;
-  backtrack?: boolean;
-  indentRight?: boolean;
-  selectedCharacter?: string;
-  repeat?: number;
-  repeatIsExplicit?: boolean;
-  registerName?: string;
-  head?: Pos;
-}
-
-export interface OperatorArgs {
-  indentRight?: boolean;
-  toLower?: boolean;
-  linewise?: boolean;
-  shouldMoveCursor?: boolean;
-  fullLine?: boolean;
-  selectedCharacter?: string;
-  lastSel?: Pick<
-    LastSelection,
-    "anchor" | "head" | "visualBlock" | "visualLine"
-  >;
-  repeat?: number;
-  registerName?: string;
-}
-
-interface SearchArgs {
-  forward: boolean;
-  querySrc: "prompt" | "wordUnderCursor";
-  toJumplist: boolean;
-  wholeWordOnly?: boolean;
-  selectedCharacter?: string;
-}
-
-interface OperatorMotionArgs {
-  visualLine: boolean;
-}
-
-interface ExArgs {
-  input: string;
-}
-
-export type Context = "insert" | "normal" | "visual";
-
-export type MappableCommandType =
-  | "motion"
-  | "action"
-  | "operator"
-  | "operatorMotion"
-  | "search"
-  | "ex";
-export type MappableArgType =
-  | MotionArgs
-  | ActionArgs
-  | OperatorArgs
-  | OperatorMotionArgs
-  | SearchArgs
-  | ExArgs;
-
-export interface KeyMapping {
-  keys: string;
-  type: "keyToKey" | "idle" | "keyToEx" | MappableCommandType;
-  context?: Context;
-  toKeys?: string;
-  action?: string;
-  actionArgs?: ActionArgs;
-  motion?: string;
-  motionArgs?: MotionArgs;
-  isEdit?: boolean;
-  operator?: string;
-  operatorArgs?: OperatorArgs;
-  operatorMotion?: string;
-  operatorMotionArgs?: OperatorMotionArgs;
-  interlaceInsertRepeat?: boolean;
-  exitVisualBlock?: boolean;
-  search?: string;
-  searchArgs?: SearchArgs;
-  repeatOverride?: number;
-  ex?: string;
-  exArgs?: ExArgs;
-}
-
-export interface ExCommand {
-  name: string;
-  type?: "exToEx" | "exToKey" | "api";
-  shortName?: string;
-  possiblyAsync?: boolean;
-  excludeFromCommandHistory?: boolean;
-  toKeys?: string;
-  toInput?: string;
-  user?: boolean;
-}
+import { vimGlobalState } from "./global";
+import {
+  VimState,
+  KeyMapping,
+  Context,
+  MappableCommandType,
+  MappableArgType,
+  MotionArgs,
+  ActionArgs,
+  OperatorArgs,
+  OperatorMotionArgs,
+  SearchArgs,
+  ExArgs,
+} from "./types";
 
 function enterVimMode(adapter: EditorAdapter) {
   adapter.setOption("disableInput", true);
@@ -285,8 +101,21 @@ function detachVimMap(adapter: EditorAdapter, next?: KeyMapEntry) {
 
   if (!next || next.attach != attachVimMap) leaveVimMode(adapter);
 }
-function attachVimMap(adapter: EditorAdapter, prev?: KeyMapEntry) {
-  if (this == EditorAdapter.keyMap.vim) {
+function attachVimMap(
+  this: {
+    attach: (adapter: EditorAdapter, prev?: KeyMapEntry) => void;
+    detach: (adapter: EditorAdapter, next?: KeyMapEntry | undefined) => void;
+    call: (
+      key: string,
+      adapter: EditorAdapter
+    ) => false | (() => boolean) | undefined;
+    fallthrough?: string[];
+    keys?: { Backspace: string };
+  },
+  adapter: EditorAdapter,
+  prev?: KeyMapEntry
+) {
+  if ((this as KeyMapEntry) === EditorAdapter.keyMap.vim) {
     adapter.attached = true;
     if (adapter.curOp) {
       adapter.curOp.selectionChanged = true;
@@ -299,11 +128,6 @@ function attachVimMap(adapter: EditorAdapter, prev?: KeyMapEntry) {
 function cmKey(key: string, adapter: EditorAdapter) {
   if (!adapter) {
     return undefined;
-  }
-  if (this[key]) {
-    // return this[key];
-    console.error("cmKey: return this[key];", key);
-    throw new Error(`cmKey: return this[key]; ${key}`);
   }
   const vimKey = cmKeyToVimKey(key);
   if (!vimKey) {
@@ -391,7 +215,7 @@ function cmKeyToVimKey(key: string) {
 export const keywordCharTest = [
   (ch: string) => isKeywordTest(ch),
   function (ch: string) {
-    return ch && !isKeywordTest(ch) && !/\s/.test(ch);
+    return !!(ch && !isKeywordTest(ch) && !/\s/.test(ch));
   },
 ];
 export const bigWordCharTest = [
@@ -486,7 +310,7 @@ export function maybeInitVimState(adapter: EditorAdapter): VimState {
       lastHSPos: -1,
       // The last motion command run. Cleared if a non-motion command gets
       // executed in between.
-      lastMotion: null,
+      lastMotion: undefined,
       marks: {},
       insertMode: false,
       // Repeat count for changes made in insert mode, triggered by key
@@ -496,8 +320,8 @@ export function maybeInitVimState(adapter: EditorAdapter): VimState {
       // If we are in visual line mode. No effect if visualMode is false.
       visualLine: false,
       visualBlock: false,
-      lastSelection: null,
-      lastPastedText: null,
+      lastSelection: undefined,
+      lastPastedText: undefined,
       sel: new CmSelection(makePos(0, 0), makePos(0, 0)),
       // Buffer-local/window-local values of vim options.
       options: {},
@@ -505,32 +329,6 @@ export function maybeInitVimState(adapter: EditorAdapter): VimState {
     adapter.state.vim = vimState;
   }
   return adapter.state.vim as VimState;
-}
-
-export let vimGlobalState: VimGlobalState;
-export function resetVimGlobalState() {
-  vimGlobalState = {
-    // The current search query.
-    searchQuery: null,
-    // Whether we are searching backwards.
-    searchIsReversed: false,
-    // Replace part of the last substituted pattern
-    lastSubstituteReplacePart: undefined,
-    jumpList: createCircularJumpList(),
-    macroModeState: new MacroModeState(),
-    // Recording latest f, t, F or T motion command.
-    lastCharacterSearch: {
-      increment: 0,
-      forward: true,
-      selectedCharacter: "",
-    },
-    registerController: new RegisterController({}),
-    // search history buffer
-    searchHistoryController: new HistoryController(),
-    // ex Command history buffer
-    exCommandHistoryController: new HistoryController(),
-  };
-  resetOptions();
 }
 
 export function clearInputState(adapter: EditorAdapter, reason?: string) {
@@ -574,7 +372,7 @@ export function offsetCursor(
   if (isPos(offsetLine)) {
     return makePos(cur.line + offsetLine.line, cur.ch + offsetLine.ch);
   }
-  return makePos(cur.line + offsetLine, cur.ch + offsetCh);
+  return makePos(cur.line + offsetLine, cur.ch + offsetCh!);
 }
 
 export function commandMatches(
@@ -604,8 +402,8 @@ export function commandMatches(
     }
   });
   return {
-    partial: partial.length && partial,
-    full: full.length && full,
+    partial: partial.length ? partial : undefined,
+    full: full.length ? full : undefined,
   };
 }
 function commandMatch(pressed: string, mapped: string) {
@@ -680,7 +478,7 @@ export function updateLastSelection(adapter: EditorAdapter, vim: VimState) {
     head = adapter.posFromIndex(
       adapter.indexFromPos(anchor) + vim.lastPastedText.length
     );
-    vim.lastPastedText = null;
+    vim.lastPastedText = undefined;
   }
   vim.lastSelection = {
     anchorMark: adapter.setBookmark(anchor),
@@ -735,55 +533,56 @@ export function makeCmSelection(
 } {
   let head = copyCursor(sel.head);
   let anchor = copyCursor(sel.anchor);
-  if (mode == "char") {
-    const headOffset =
-      !exclusive && !cursorIsBefore(sel.head, sel.anchor) ? 1 : 0;
-    const anchorOffset = cursorIsBefore(sel.head, sel.anchor) ? 1 : 0;
-    head = offsetCursor(sel.head, 0, headOffset);
-    anchor = offsetCursor(sel.anchor, 0, anchorOffset);
-    return {
-      ranges: [new CmSelection(anchor, head)],
-      primary: 0,
-    };
-  } else if (mode == "line") {
-    if (!cursorIsBefore(sel.head, sel.anchor)) {
-      anchor.ch = 0;
+  switch (mode) {
+    case "char":
+      const headOffset =
+        !exclusive && !cursorIsBefore(sel.head, sel.anchor) ? 1 : 0;
+      const anchorOffset = cursorIsBefore(sel.head, sel.anchor) ? 1 : 0;
+      head = offsetCursor(sel.head, 0, headOffset);
+      anchor = offsetCursor(sel.anchor, 0, anchorOffset);
+      return {
+        ranges: [new CmSelection(anchor, head)],
+        primary: 0,
+      };
+    case "line":
+      if (!cursorIsBefore(sel.head, sel.anchor)) {
+        anchor.ch = 0;
 
-      const lastLine = adapter.lastLine();
-      if (head.line > lastLine) {
-        head.line = lastLine;
+        const lastLine = adapter.lastLine();
+        if (head.line > lastLine) {
+          head.line = lastLine;
+        }
+        head.ch = lineLength(adapter, head.line);
+      } else {
+        head.ch = 0;
+        anchor.ch = lineLength(adapter, anchor.line);
       }
-      head.ch = lineLength(adapter, head.line);
-    } else {
-      head.ch = 0;
-      anchor.ch = lineLength(adapter, anchor.line);
-    }
-    return {
-      ranges: [new CmSelection(anchor, head)],
-      primary: 0,
-    };
-  } else if (mode == "block") {
-    const top = Math.min(anchor.line, head.line);
-    let fromCh = anchor.ch;
-    const bottom = Math.max(anchor.line, head.line);
-    let toCh = head.ch;
-    if (fromCh < toCh) {
-      toCh += 1;
-    } else {
-      fromCh += 1;
-    }
-    const height = bottom - top + 1;
-    const primary = head.line == top ? 0 : height - 1;
-    const ranges: CmSelection[] = [];
-    for (let i = 0; i < height; i++) {
-      ranges.push(
-        new CmSelection(makePos(top + i, fromCh), makePos(top + i, toCh))
-      );
-    }
-    return {
-      ranges: ranges,
-      primary: primary,
-    };
+      return {
+        ranges: [new CmSelection(anchor, head)],
+        primary: 0,
+      };
+    case "block":
+      const top = Math.min(anchor.line, head.line);
+      let fromCh = anchor.ch;
+      const bottom = Math.max(anchor.line, head.line);
+      let toCh = head.ch;
+      if (fromCh < toCh) {
+        toCh += 1;
+      } else {
+        fromCh += 1;
+      }
+      const height = bottom - top + 1;
+      const primary = head.line == top ? 0 : height - 1;
+      const ranges: CmSelection[] = [];
+      for (let i = 0; i < height; i++) {
+        ranges.push(
+          new CmSelection(makePos(top + i, fromCh), makePos(top + i, toCh))
+        );
+      }
+      return {
+        ranges: ranges,
+        primary: primary,
+      };
   }
 }
 
@@ -867,7 +666,7 @@ export function expandWordUnderCursor(
   _forward: boolean,
   bigWord: boolean,
   noSymbol?: boolean
-): [Pos, Pos] {
+): [Pos, Pos] | undefined {
   const cur = getHead(adapter);
   const line = adapter.getLine(cur.line);
   let idx = cur.ch;
@@ -880,7 +679,7 @@ export function expandWordUnderCursor(
   while (!test(line.charAt(idx))) {
     idx++;
     if (idx >= line.length) {
-      return null;
+      return;
     }
   }
 
@@ -1068,7 +867,7 @@ function unescapeRegexReplace(str: string) {
   while (!stream.eol()) {
     // Search for \.
     while (stream.peek() && stream.peek() != "\\") {
-      output.push(stream.next());
+      output.push(stream.next()!);
     }
     let matched = false;
     for (const matcher in unescapes) {
@@ -1080,7 +879,7 @@ function unescapeRegexReplace(str: string) {
     }
     if (!matched) {
       // Don't change anything
-      output.push(stream.next());
+      output.push(stream.next()!);
     }
   }
   return output.join("");
@@ -1113,7 +912,7 @@ function parseQuery(
   // the regex string in the form /regex/flags
   const slashes = findUnescapedSlashes(query);
   let regexPart: string;
-  let forceIgnoreCase: boolean;
+  let forceIgnoreCase: boolean | undefined;
   if (!slashes.length) {
     // Query looks like 'regexp'
     regexPart = query;
@@ -1142,7 +941,7 @@ export function showConfirm(adapter: EditorAdapter, template: string) {
 interface PromptOptions extends SecInfoOptions {
   prefix: string;
   desc?: string;
-  onClose: (value?: string) => void;
+  onClose: (value: string) => void;
 }
 
 export function showPrompt(adapter: EditorAdapter, options: PromptOptions) {
@@ -1183,7 +982,7 @@ export function updateSearchQuery(
     return;
   }
   highlightSearchMatches(adapter, query);
-  if (regexEqual(query, state.getQuery())) {
+  if (regexEqual(query, state.getQuery()!)) {
     return query;
   }
   state.setQuery(query);
@@ -1249,7 +1048,7 @@ export function findNext(
 export function clearSearchHighlight(adapter: EditorAdapter) {
   const state = getSearchState(adapter);
   adapter.removeOverlay();
-  state.setOverlay(null);
+  state.setOverlay(undefined);
   if (state.getScrollbarAnnotate()) {
     state.getScrollbarAnnotate().clear();
     state.setScrollbarAnnotate(null);
@@ -1266,7 +1065,7 @@ export function clearSearchHighlight(adapter: EditorAdapter) {
  *   if there are 2 range arguments, then check if pos is in between the two
  *       range arguments.
  */
-function isInRange(pos: Pos | number, start?: number | number[], end?: number) {
+function isInRange(pos: Pos | number, start: number | number[], end?: number) {
   if (isPos(pos)) {
     // Assume it is a cursor position. Get the line number.
     pos = pos.line;
@@ -1363,7 +1162,7 @@ export const exCommands: Record<string, ExCommandFunc> = {
       type: "motion",
       motion: "moveToLineOrEdgeOfDocument",
       motionArgs: { forward: false, explicitRepeat: true, linewise: true },
-      repeatOverride: params.line + 1,
+      repeatOverride: params.line! + 1,
     });
   },
   set: function (adapter, params) {
@@ -1460,11 +1259,11 @@ export const exCommands: Record<string, ExCommandFunc> = {
     showConfirm(adapter, regInfo.join("\n"));
   },
   sort: function (adapter, params) {
-    let reverse: boolean;
-    let ignoreCase: boolean;
-    let unique: boolean;
-    let number: "decimal" | "hex" | "octal";
-    let pattern: RegExp;
+    let reverse: boolean | undefined;
+    let ignoreCase: boolean | undefined;
+    let unique: boolean | undefined;
+    let number: "decimal" | "hex" | "octal" | undefined;
+    let pattern: RegExp | undefined;
     const parseArgs = () => {
       if (params.argString) {
         const args = new StringStream(params.argString);
@@ -1522,21 +1321,17 @@ export const exCommands: Record<string, ExCommandFunc> = {
     const text = adapter.getRange(curStart, curEnd).split("\n");
     const numberRegex = pattern
       ? pattern
-      : number == "decimal"
+      : number == "decimal" || number === undefined
       ? /(-?)([\d]+)/
       : number == "hex"
       ? /(-?)(?:0x)?([0-9a-f]+)/i
-      : number == "octal"
-      ? /([0-7]+)/
-      : null;
+      : /([0-7]+)/;
     const radix =
-      number == "decimal"
+      number == "decimal" || number === undefined
         ? 10
         : number == "hex"
         ? 16
-        : number == "octal"
-        ? 8
-        : null;
+        : 8;
     const numPart: (RegExpMatchArray | string)[] = [];
     const textPart: string[] = [];
     if (number || pattern) {
@@ -1565,7 +1360,7 @@ export const exCommands: Record<string, ExCommandFunc> = {
       }
       const anum = number && numberRegex.exec(a);
       const bnum = number && numberRegex.exec(b);
-      if (!anum) {
+      if (!anum || !bnum) {
         return a < b ? -1 : 1;
       }
       return (
@@ -1585,12 +1380,12 @@ export const exCommands: Record<string, ExCommandFunc> = {
         return a[0] < b[0] ? -1 : 1;
       }
     };
-    numPart.sort(pattern ? comparePatternFn : compareFn);
+    (numPart as string[]).sort(pattern ? comparePatternFn : compareFn);
     if (pattern) {
       for (let i = 0; i < numPart.length; i++) {
         const np = numPart[i];
         if (typeof np !== "string") {
-          numPart[i] = np.input;
+          numPart[i] = np.input!;
         }
       }
     } else if (!number) {
@@ -1634,7 +1429,7 @@ export const exCommands: Record<string, ExCommandFunc> = {
       showConfirm(adapter, "Regular Expression missing from global");
       return;
     }
-    const inverted = params.commandName[0] === "v";
+    const inverted = params.commandName![0] === "v";
     // range is specified here
     const lineStart =
       params.line !== undefined ? params.line : adapter.firstLine();
@@ -1642,8 +1437,8 @@ export const exCommands: Record<string, ExCommandFunc> = {
     // get the tokens from argString
     const tokens = splitBySlash(argString);
     let regexPart = argString;
-    let cmd: string;
-    if (tokens.length) {
+    let cmd: string | undefined;
+    if (tokens && tokens.length) {
       regexPart = tokens[0];
       cmd = tokens.slice(1, tokens.length).join("/");
     }
@@ -1664,7 +1459,7 @@ export const exCommands: Record<string, ExCommandFunc> = {
     }
     // now that we have the regexPart, search for regex matches in the
     // specified range of lines
-    const query = getSearchState(adapter).getQuery();
+    const query = getSearchState(adapter).getQuery()!;
     const matchedLines: { line: number; text: string }[] = [];
     for (let i = lineStart; i <= lineEnd; i++) {
       const line = adapter.getLine(i);
@@ -1699,13 +1494,13 @@ export const exCommands: Record<string, ExCommandFunc> = {
     }
     const argString = params.argString;
     const tokens = argString ? splitBySeparator(argString, argString[0]) : [];
-    let regexPart: string;
-    let replacePart = "";
-    let trailing: string[];
-    let count: number;
+    let regexPart: string | undefined;
+    let replacePart: string | undefined = "";
+    let trailing: string[] | undefined;
+    let count: number | undefined;
     let confirm = false; // Whether to confirm each replace.
     let global = false; // True to replace all instances on a line, false to replace only 1.
-    if (tokens.length) {
+    if (tokens && tokens.length) {
       regexPart = tokens[0];
       if (getOption("pcre") && regexPart !== "") {
         regexPart = new RegExp(regexPart).source; //normalize not escaped characters
@@ -1747,9 +1542,9 @@ export const exCommands: Record<string, ExCommandFunc> = {
           global = true;
         }
         if (getOption("pcre")) {
-          regexPart = regexPart + "/" + flagsPart;
+          regexPart = regexPart! + "/" + flagsPart;
         } else {
-          regexPart = regexPart.replace(/\//g, "\\/") + "/" + flagsPart;
+          regexPart = regexPart!.replace(/\//g, "\\/") + "/" + flagsPart;
         }
       }
     }
@@ -1774,7 +1569,7 @@ export const exCommands: Record<string, ExCommandFunc> = {
       return;
     }
     const state = getSearchState(adapter);
-    const query = state.getQuery();
+    const query = state.getQuery()!;
     let lineStart =
       params.line !== undefined ? params.line : adapter.getCursor().line;
     let lineEnd = params.lineEnd || lineStart;
@@ -1878,8 +1673,8 @@ export const exCommands: Record<string, ExCommandFunc> = {
           return;
         }
 
-        const startMark = sym;
-        const finishMark = stream.next();
+        const startMark = sym!;
+        const finishMark = stream.next()!;
         // The range must terminate at an alphabetic character which
         // shares the same case as the start of the range.
         if (
@@ -1909,7 +1704,7 @@ export const exCommands: Record<string, ExCommandFunc> = {
         }
       } else {
         // This symbol is a valid mark, and is not part of a range.
-        delete state.marks[sym];
+        delete state.marks[sym!];
       }
     }
   },
@@ -1938,7 +1733,7 @@ function doReplace(
   >,
   query: RegExp,
   replaceWith: string,
-  callback: () => void
+  callback?: () => void
 ) {
   const vim = adapter.state.vim as VimState;
   // Set up all the functions.
@@ -1967,12 +1762,7 @@ function doReplace(
   const findNextValidMatch = () => {
     const lastMatchTo = lastPos && copyCursor(searchCursor.to());
     let match = searchCursor.findNext();
-    if (
-      match &&
-      !match[0] &&
-      lastMatchTo &&
-      cursorEqual(searchCursor.from(), lastMatchTo)
-    ) {
+    if (match && lastMatchTo && cursorEqual(searchCursor.from(), lastMatchTo)) {
       match = searchCursor.findNext();
     }
     return match;
@@ -2085,15 +1875,15 @@ export function exitInsertMode(adapter: EditorAdapter) {
   if (!isPlaying) {
     adapter.off("change", onChange);
   }
-  if (!isPlaying && vim.insertModeRepeat > 1) {
+  if (!isPlaying && vim.insertModeRepeat! > 1) {
     // Perform insert mode repeat for commands like 3,a and 3,o.
     repeatLastEdit(
       adapter,
       vim,
-      vim.insertModeRepeat - 1,
+      vim.insertModeRepeat! - 1,
       true /** repeatForInsert */
     );
-    vim.lastEditInputState.repeatOverride = vim.insertModeRepeat;
+    vim.lastEditInputState!.repeatOverride = vim.insertModeRepeat;
   }
   delete vim.insertModeRepeat;
   vim.insertMode = false;
@@ -2162,7 +1952,7 @@ export function logKey(macroModeState: MacroModeState, key: string) {
   if (macroModeState.isPlaying) {
     return;
   }
-  const registerName = macroModeState.latestRegister;
+  const registerName = macroModeState.latestRegister!;
   const register = vimGlobalState.registerController.getRegister(registerName);
   if (register) {
     register.pushText(key);
@@ -2173,7 +1963,7 @@ function logInsertModeChange(macroModeState: MacroModeState) {
   if (macroModeState.isPlaying) {
     return;
   }
-  const registerName = macroModeState.latestRegister;
+  const registerName = macroModeState.latestRegister!;
   const register =
     vimGlobalState.registerController.getInternalRegister(registerName);
   if (register && register.pushInsertModeChanges) {
@@ -2185,7 +1975,7 @@ export function logSearchQuery(macroModeState: MacroModeState, query: string) {
   if (macroModeState.isPlaying) {
     return;
   }
-  const registerName = macroModeState.latestRegister;
+  const registerName = macroModeState.latestRegister!;
   const register =
     vimGlobalState.registerController.getInternalRegister(registerName);
   if (register && register.pushSearchQuery) {
@@ -2197,14 +1987,15 @@ export function logSearchQuery(macroModeState: MacroModeState, query: string) {
  * Listens for changes made in insert mode.
  * Should only be active in insert mode.
  */
-export function onChange(adapter: EditorAdapter, changeObj: Change): void {
+export function onChange(adapter: EditorAdapter, change: Change): void {
+  let changeObj: Change | undefined = change;
   const macroModeState = vimGlobalState.macroModeState;
   const lastChange = macroModeState.lastInsertModeChanges;
   if (!macroModeState.isPlaying) {
     while (changeObj) {
       lastChange.expectCursorActivityForChange = true;
-      if (lastChange.ignoreCount > 1) {
-        lastChange.ignoreCount--;
+      if (lastChange.ignoreCount! > 1) {
+        lastChange.ignoreCount!--;
       } else if (
         changeObj.origin == "+input" ||
         changeObj.origin == "paste" ||
@@ -2313,7 +2104,7 @@ export function repeatLastEdit(
   const cachedInputState = vim.inputState;
   const repeatCommand = () => {
     if (isAction) {
-      commandDispatcher.processAction(adapter, vim, vim.lastEditActionCommand);
+      commandDispatcher.processAction(adapter, vim, vim.lastEditActionCommand!);
     } else {
       commandDispatcher.evalInput(adapter, vim);
     }
@@ -2327,8 +2118,8 @@ export function repeatLastEdit(
       repeatInsertModeChanges(adapter, changeObject.changes, repeat);
     }
   };
-  vim.inputState = vim.lastEditInputState;
-  if (isAction && vim.lastEditActionCommand.interlaceInsertRepeat) {
+  vim.inputState = vim.lastEditInputState!;
+  if (isAction && vim.lastEditActionCommand!.interlaceInsertRepeat) {
     // o and O repeat have to be interlaced with insert repeats so that the
     // insertions appear on separate lines instead of the last line.
     for (let i = 0; i < repeat; i++) {
@@ -2358,9 +2149,12 @@ export function repeatInsertModeChanges(
   changes: (string | InsertModeKey)[],
   repeat: number
 ) {
-  const keyHandler = (binding: string | ((adapter: EditorAdapter) => void)) => {
+  const keyHandler = (
+    binding: string | string[] | BindingFunction
+  ): boolean => {
     if (typeof binding == "string") {
       EditorAdapter.commands[binding](adapter, {});
+    } else if (Array.isArray(binding)) {
     } else {
       binding(adapter);
     }
@@ -2439,16 +2233,17 @@ defineOption(
   "@,48-57,_,192-255",
   "string",
   ["isk"],
-  (value, adapter) => {
+  (value) => {
     if (typeof value !== "string") {
       return isKeywordValue || kDefaultIsKeyword;
     }
     const parts = value.split(",");
 
-    const ranges: CharRange[] = parts.flatMap((p) => {
+    const ranges = parts.reduce((l: CharRange[], p) => {
       // @ represents alpha characters
       if (p === "@") {
         return [
+          ...l,
           { from: "A".charCodeAt(0), to: "Z".charCodeAt(0) },
           { from: "a".charCodeAt(0), to: "z".charCodeAt(0) },
         ];
@@ -2456,28 +2251,29 @@ defineOption(
       // @-@ represents the character @
       if (p === "@-@") {
         const at = "@".charCodeAt(0);
-        return { from: at, to: at };
+        return [...l, { from: at, to: at }];
       }
       //  <num>-<num> is an inclusive range of characters
       const m = p.match(/^(\d+)-(\d+)$/);
       if (m) {
-        return { from: Number(m[1]), to: Number(m[2]) };
+        return [...l, { from: Number(m[1]), to: Number(m[2]) }];
       }
       // <num> is a single character code
       const n = Number(p);
       if (!isNaN(n)) {
-        return { from: n, to: n };
+        return [...l, { from: n, to: n }];
       }
       // any single character is itself
       if (p.length == 1) {
         const ch = p.charCodeAt(0);
-        return { from: ch, to: ch };
+        return [...l, { from: ch, to: ch }];
       }
       // ignore anything else
-      return [];
-    });
+      return l;
+    }, []);
     isKeywordRanges = ranges;
     isKeywordValue = value;
+    return isKeywordValue;
   },
   {
     commas: true,
@@ -2503,7 +2299,7 @@ defineOption(
     }
 
     if (!adapter) {
-      return;
+      return "";
     }
     const theme = adapter.getOption("theme").toString();
     if (theme.toLowerCase().endsWith(value)) {

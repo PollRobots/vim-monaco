@@ -1,9 +1,9 @@
 import { isUpperCase } from "./common";
+import { vimGlobalState } from "./global";
 import {
   InsertModeChanges,
   createInsertModeChanges,
   validRegisters,
-  vimGlobalState,
 } from "./keymap_vim";
 
 export interface IRegister {

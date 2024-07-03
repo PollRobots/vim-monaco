@@ -2,19 +2,16 @@ import EditorAdapter from "./adapter";
 import { StringStream } from "./string-stream";
 import { defaultKeymap } from "./default-key-map";
 import {
-  ExCommand,
   ExCommandOptionalParameters,
-  VimState,
-  vimGlobalState,
   exitVisualMode,
   showConfirm,
   vimApi,
   exCommands,
   getMarkPos,
   trim,
-  Context,
-  KeyMapping,
 } from "./keymap_vim";
+import { vimGlobalState } from "./global";
+import { ExCommand, VimState, Context, KeyMapping } from "./types";
 
 /**
  * Ex commands
@@ -83,11 +80,11 @@ export class ExCommandDispatcher {
     try {
       this.parseInput_(adapter, inputStream, params);
     } catch (e) {
-      showConfirm(adapter, e.toString());
+      showConfirm(adapter, `${e}`);
       throw e;
     }
-    let command: ExCommand;
-    let commandName: string;
+    let command: ExCommand | undefined;
+    let commandName: string | undefined;
     if (!params.commandName) {
       // If only a line range is defined, move to the line.
       if (params.line !== undefined) {
@@ -103,13 +100,13 @@ export class ExCommandDispatcher {
         this.parseCommandArgs_(inputStream, params, command);
         if (command.type == "exToKey") {
           // Handle Ex to Key mapping.
-          for (let i = 0; i < command.toKeys.length; i++) {
-            vimApi.handleKey(adapter, command.toKeys[i], "mapping");
+          for (let i = 0; i < command.toKeys!.length; i++) {
+            vimApi.handleKey(adapter, command.toKeys![i], "mapping");
           }
           return;
         } else if (command.type == "exToEx") {
           // Handle Ex to Ex mapping.
-          this.processCommand(adapter, command.toInput);
+          this.processCommand(adapter, command.toInput!);
           return;
         }
       }
@@ -127,7 +124,7 @@ export class ExCommandDispatcher {
         params.callback();
       }
     } catch (e) {
-      showConfirm(adapter, e.toString());
+      showConfirm(adapter, `${e}`);
       throw e;
     }
   }
@@ -174,6 +171,10 @@ export class ExCommandDispatcher {
         return this.parseLineSpecOffset_(inputStream, adapter.lastLine());
       case "'":
         const markName = inputStream.next();
+        if (!markName) {
+          inputStream.backUp(1);
+          return;
+        }
         const markPos = getMarkPos(adapter, adapter.state.vim, markName);
         if (!markPos) throw new Error("Mark not set");
         return this.parseLineSpecOffset_(inputStream, markPos.line);
@@ -184,7 +185,7 @@ export class ExCommandDispatcher {
         return this.parseLineSpecOffset_(inputStream, adapter.getCursor().line);
       default:
         inputStream.backUp(1);
-        return undefined;
+        return;
     }
   }
 
@@ -226,13 +227,13 @@ export class ExCommandDispatcher {
     for (let i = commandName.length; i > 0; i--) {
       const prefix = commandName.substring(0, i);
       if (this.commandMap_.has(prefix)) {
-        const command = this.commandMap_.get(prefix);
+        const command = this.commandMap_.get(prefix)!;
         if (command.name.indexOf(commandName) === 0) {
           return command;
         }
       }
     }
-    return null;
+    return;
   }
 
   private buildCommandMap_() {
@@ -300,10 +301,8 @@ export class ExCommandDispatcher {
         throw Error("Mode not supported for ex mappings");
       }
       const commandName = lhs.substring(1);
-      if (
-        this.commandMap_.has(commandName) &&
-        this.commandMap_.get(commandName).user
-      ) {
+      const command = this.commandMap_.get(commandName);
+      if (command && command.user) {
         this.commandMap_.delete(commandName);
         return true;
       }

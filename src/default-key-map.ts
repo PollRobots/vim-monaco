@@ -1,4 +1,4 @@
-import { KeyMapping } from "./keymap_vim";
+import { KeyMapping } from "./types";
 
 export let defaultKeymap: KeyMapping[] = [
   // Key to key mapping. This goes first to make it possible to override

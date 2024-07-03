@@ -1,5 +1,5 @@
 import EditorAdapter from "./adapter";
-import { VimState } from "./keymap_vim";
+import { VimState } from "./types";
 
 export type OptionCallback = (
   value?: string | number | boolean,
@@ -18,7 +18,7 @@ interface Option {
   type: "string" | "number" | "boolean";
   value?: string | number | boolean;
   defaultValue: string | number | boolean | undefined;
-  callback: OptionCallback;
+  callback?: OptionCallback;
   setConfig?: OptionConfig;
 }
 
@@ -192,7 +192,7 @@ export function getOption(
 
 export const resetOptions = () => {
   for (const optionName in options) {
-    const option = options.get(optionName);
+    const option = options.get(optionName)!;
     option.value = option.defaultValue;
   }
 };

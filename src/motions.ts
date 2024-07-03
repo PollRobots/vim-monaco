@@ -19,8 +19,6 @@ import {
   makePos,
 } from "./common";
 import {
-  MotionArgs,
-  VimState,
   bigWordCharTest,
   clipCursorToContent,
   expandWordUnderCursor,
@@ -30,11 +28,11 @@ import {
   keywordCharTest,
   lineLength,
   offsetCursor,
-  validMarks,
-  vimGlobalState,
 } from "./keymap_vim";
 import { InputState } from "./input-state";
 import { getSearchState } from "./search";
+import { vimGlobalState } from "./global";
+import { MotionArgs, VimState } from "./types";
 
 // All of the functions below return Cursor objects.
 export type MotionFunc = (
@@ -47,7 +45,7 @@ export type MotionFunc = (
 type MotionResult = Pos | [Pos, Pos] | undefined;
 export const motions: Record<string, MotionFunc> = {
   moveToTopLine: function (adapter, _head, motionArgs) {
-    const line = getUserVisibleLines(adapter).top + motionArgs.repeat - 1;
+    const line = getUserVisibleLines(adapter).top + motionArgs.repeat! - 1;
     return makePos(
       line,
       findFirstNonWhiteSpaceCharacter(adapter.getLine(line))
@@ -62,7 +60,7 @@ export const motions: Record<string, MotionFunc> = {
     );
   },
   moveToBottomLine: function (adapter, _head, motionArgs) {
-    const line = getUserVisibleLines(adapter).bottom - motionArgs.repeat + 1;
+    const line = getUserVisibleLines(adapter).bottom - motionArgs.repeat! + 1;
     return makePos(
       line,
       findFirstNonWhiteSpaceCharacter(adapter.getLine(line))
@@ -71,7 +69,7 @@ export const motions: Record<string, MotionFunc> = {
   expandToLine: function (_cm, head, motionArgs) {
     // Expands forward to end of line, and then to next line if repeat is
     // >1. Does not handle backward motion!
-    return makePos(head.line + motionArgs.repeat - 1, Infinity);
+    return makePos(head.line + motionArgs.repeat! - 1, Infinity);
   },
   findNext: function (adapter, _head, motionArgs) {
     const state = getSearchState(adapter);
@@ -107,7 +105,7 @@ export const motions: Record<string, MotionFunc> = {
     const state = getSearchState(adapter);
     const query = state.getQuery();
 
-    if (!query) {
+    if (!query || !vim) {
       return;
     }
 
@@ -119,17 +117,17 @@ export const motions: Record<string, MotionFunc> = {
       adapter,
       prev,
       query,
-      motionArgs.repeat,
+      motionArgs.repeat!,
       vim
     );
 
     // No matches.
-    if (!next) {
+    if (!next || !vim) {
       return;
     }
 
     // If there's an operator that will be executed, return the selection.
-    if (prevInputState.operator) {
+    if (prevInputState && prevInputState.operator) {
       return next;
     }
 
@@ -185,7 +183,7 @@ export const motions: Record<string, MotionFunc> = {
     return prev ? [to, from] : [from, to];
   },
   goToMark: function (adapter, _head, motionArgs, vim) {
-    const pos = getMarkPos(adapter, vim, motionArgs.selectedCharacter);
+    const pos = getMarkPos(adapter, vim!, motionArgs.selectedCharacter!);
     if (pos) {
       return motionArgs.linewise
         ? makePos(
@@ -197,6 +195,9 @@ export const motions: Record<string, MotionFunc> = {
     return;
   },
   moveToOtherHighlightedEnd: function (adapter, _head, motionArgs, vim) {
+    if (!vim) {
+      return;
+    }
     if (vim.visualBlock && motionArgs.sameLine) {
       const sel = vim.sel;
       return [
@@ -208,8 +209,11 @@ export const motions: Record<string, MotionFunc> = {
     }
   },
   jumpToMark: function (adapter, head, motionArgs, vim) {
+    if (!vim) {
+      return;
+    }
     let best = head;
-    for (let i = 0; i < motionArgs.repeat; i++) {
+    for (let i = 0; i < motionArgs.repeat!; i++) {
       let cursor = best;
       for (const key in vim.marks) {
         if (!isLowerCase(key)) {
@@ -255,7 +259,7 @@ export const motions: Record<string, MotionFunc> = {
     const ch = motionArgs.forward ? cur.ch + repeat : cur.ch - repeat;
     return makePos(cur.line, ch);
   },
-  moveByLines: function (adapter, head, motionArgs, vim) {
+  moveByLines: function (adapter, head, motionArgs, vim, prevInputState) {
     const cur = head;
     let endCh = cur.ch;
     // Depending what our last motion was, we may want to do different
@@ -294,7 +298,13 @@ export const motions: Record<string, MotionFunc> = {
     // Vim go to line begin or line end when cursor at first/last line and
     // move to previous/next line is triggered.
     if (line < first && cur.line == first) {
-      return this.moveToStartOfLine(adapter, head, motionArgs, vim);
+      return this.moveToStartOfLine(
+        adapter,
+        head,
+        motionArgs,
+        vim,
+        prevInputState
+      );
     } else if (line > last && cur.line == last) {
       return moveToEol(adapter, head, motionArgs, vim, true);
     }
@@ -332,7 +342,7 @@ export const motions: Record<string, MotionFunc> = {
     // doing this bad hack to move the cursor and move it back. evalInput
     // will move the cursor to where it should be in the end.
     const curStart = head;
-    const repeat = motionArgs.repeat;
+    const repeat = motionArgs.repeat!;
     return adapter.findPosV(
       curStart,
       motionArgs.forward ? repeat : -repeat,
@@ -341,13 +351,13 @@ export const motions: Record<string, MotionFunc> = {
   },
   moveByParagraph: function (adapter, head, motionArgs) {
     const dir = motionArgs.forward ? 1 : -1;
-    return findParagraph(adapter, head, motionArgs.repeat, dir);
+    return findParagraph(adapter, head, motionArgs.repeat!, dir);
   },
   moveBySentence: function (adapter, head, motionArgs) {
     const dir = motionArgs.forward ? 1 : -1;
-    return findSentence(adapter, head, motionArgs.repeat, dir);
+    return findSentence(adapter, head, motionArgs.repeat!, dir);
   },
-  moveByScroll: function (adapter, head, motionArgs, vim) {
+  moveByScroll: function (adapter, head, motionArgs, vim, prevInputState) {
     const scrollbox = adapter.getScrollInfo();
     let repeat = motionArgs.repeat;
     if (!repeat) {
@@ -360,20 +370,20 @@ export const motions: Record<string, MotionFunc> = {
       head,
       motionArgs,
       vim,
-      undefined
+      prevInputState
     );
     if (!curEnd) {
-      return null;
+      return;
     }
     const dest = adapter.charCoords(curEnd as Pos, "local");
-    adapter.scrollTo(null, scrollbox.top + dest.top - orig.top);
+    adapter.scrollTo(undefined, scrollbox.top + dest.top - orig.top);
     return curEnd;
   },
   moveByWords: function (adapter, head, motionArgs) {
     return moveToWord(
       adapter,
       head,
-      motionArgs.repeat,
+      motionArgs.repeat!,
       !!motionArgs.forward,
       !!motionArgs.wordEnd,
       !!motionArgs.bigWord
@@ -384,12 +394,12 @@ export const motions: Record<string, MotionFunc> = {
     const curEnd = moveToCharacter(
       adapter,
       repeat,
-      motionArgs.forward,
-      motionArgs.selectedCharacter
+      !!motionArgs.forward,
+      motionArgs.selectedCharacter!
     );
     const increment = motionArgs.forward ? -1 : 1;
     recordLastCharacterSearch(increment, motionArgs);
-    if (!curEnd) return null;
+    if (!curEnd) return;
     curEnd.ch += increment;
     return curEnd;
   },
@@ -400,8 +410,8 @@ export const motions: Record<string, MotionFunc> = {
       moveToCharacter(
         adapter,
         repeat,
-        motionArgs.forward,
-        motionArgs.selectedCharacter
+        !!motionArgs.forward,
+        motionArgs.selectedCharacter!
       ) || head
     );
   },
@@ -411,8 +421,8 @@ export const motions: Record<string, MotionFunc> = {
       findSymbol(
         adapter,
         repeat,
-        motionArgs.forward,
-        motionArgs.selectedCharacter
+        !!motionArgs.forward,
+        motionArgs.selectedCharacter!
       ) || head
     );
   },
@@ -462,7 +472,7 @@ export const motions: Record<string, MotionFunc> = {
   moveToLineOrEdgeOfDocument: function (adapter, _head, motionArgs) {
     let lineNum = motionArgs.forward ? adapter.lastLine() : adapter.firstLine();
     if (motionArgs.repeatIsExplicit) {
-      lineNum = motionArgs.repeat - adapter.getOption("firstLineNumber");
+      lineNum = motionArgs.repeat! - adapter.getOption("firstLineNumber");
     }
     return makePos(
       lineNum,
@@ -496,7 +506,7 @@ export const motions: Record<string, MotionFunc> = {
       "`": true,
     };
 
-    let character = motionArgs.selectedCharacter;
+    let character = motionArgs.selectedCharacter!;
     // 'b' refers to  '()' block.
     // 'B' refers to  '{}' block.
     if (character == "b") {
@@ -512,7 +522,7 @@ export const motions: Record<string, MotionFunc> = {
     //     'iw', 'a[', 'i[', etc.
     const inclusive = !motionArgs.textObjectInner;
 
-    let tmp: [Pos, Pos];
+    let tmp: [Pos, Pos] | undefined;
     if (mirroredPairs[character]) {
       tmp = selectCompanionObject(adapter, head, character, inclusive);
     } else if (selfPaired[character]) {
@@ -535,7 +545,7 @@ export const motions: Record<string, MotionFunc> = {
       const para = findParagraph(
         adapter,
         head,
-        motionArgs.repeat,
+        motionArgs.repeat!,
         0,
         inclusive
       );
@@ -556,7 +566,11 @@ export const motions: Record<string, MotionFunc> = {
       tmp = expandTagUnderCursor(adapter, head, inclusive);
     } else {
       // No text object defined for this, don't move.
-      return null;
+      return;
+    }
+
+    if (!tmp) {
+      return;
     }
 
     if (!adapter.state.vim.visualMode) {
@@ -615,7 +629,7 @@ function findNextFromAndToInclusive(
   query: RegExp,
   repeat: number,
   vim: VimState
-): [Pos, Pos] {
+): [Pos, Pos] | undefined {
   if (repeat === undefined) {
     repeat = 1;
   }
@@ -690,7 +704,7 @@ function moveToWord(
   }
   const shortCircuit = words.length != repeat;
   const firstWord = words[0];
-  let lastWord = words.pop();
+  let lastWord = words.pop()!;
   if (forward && !wordEnd) {
     // w
     if (
@@ -698,7 +712,7 @@ function moveToWord(
       (firstWord.from != curStart.ch || firstWord.line != curStart.line)
     ) {
       // We did not start in the middle of a word. Discard the extra word at the end.
-      lastWord = words.pop();
+      lastWord = words.pop()!;
     }
     return makePos(lastWord.line, lastWord.from);
   } else if (forward && wordEnd) {
@@ -710,7 +724,7 @@ function moveToWord(
       (firstWord.to != curStart.ch || firstWord.line != curStart.line)
     ) {
       // We did not start in the middle of a word. Discard the extra word at the end.
-      lastWord = words.pop();
+      lastWord = words.pop()!;
     }
     return makePos(lastWord.line, lastWord.to);
   } else {
@@ -727,7 +741,7 @@ function moveToEol(
   keepHPos: boolean
 ) {
   const cur = head;
-  const retval = makePos(cur.line + motionArgs.repeat - 1, Infinity);
+  const retval = makePos(cur.line + motionArgs.repeat! - 1, Infinity);
   const end = adapter.clipPos(retval);
   end.ch--;
   if (!keepHPos) {
@@ -745,7 +759,7 @@ function moveToCharacter(
 ) {
   const cur = adapter.getCursor();
   let start = cur.ch;
-  let idx;
+  let idx = 0;
   for (let i = 0; i < repeat; i++) {
     const line = adapter.getLine(cur.line);
     idx = charIdxInLine(start, line, character, forward, true);
@@ -830,9 +844,9 @@ function findParagraph(
 }
 
 interface Index {
-  line: string;
-  ln: number;
-  pos: number;
+  line?: string;
+  ln?: number;
+  pos?: number;
   dir: -1 | 1;
 }
 
@@ -855,12 +869,22 @@ function findSentence(
         no more valid positions.
        */
   const nextChar = (adapter: EditorAdapter, idx: Index) => {
+    if (
+      idx.line === undefined ||
+      idx.ln === undefined ||
+      idx.pos === undefined
+    ) {
+      idx.line = undefined;
+      idx.ln = undefined;
+      idx.pos = undefined;
+      return;
+    }
     if (idx.pos + idx.dir < 0 || idx.pos + idx.dir >= idx.line.length) {
       idx.ln += idx.dir;
       if (!isLine(adapter, idx.ln)) {
-        idx.line = null;
-        idx.ln = null;
-        idx.pos = null;
+        idx.line = undefined;
+        idx.ln = undefined;
+        idx.pos = undefined;
         return;
       }
       idx.line = adapter.getLine(idx.ln);
@@ -900,7 +924,7 @@ function findSentence(
     // Move one step to skip character we start on
     nextChar(adapter, curr);
 
-    while (curr.line !== null) {
+    while (curr.line === undefined && curr.pos !== undefined) {
       last_valid.ln = curr.ln;
       last_valid.pos = curr.pos;
 
@@ -908,15 +932,15 @@ function findSentence(
         return { ln: curr.ln, pos: curr.pos };
       } else if (
         stop &&
-        curr.line !== "" &&
+        curr.line &&
         !isWhiteSpaceString(curr.line[curr.pos])
       ) {
         return { ln: curr.ln, pos: curr.pos };
       } else if (
-        isEndOfSentenceSymbol(curr.line[curr.pos]) &&
+        isEndOfSentenceSymbol(curr.line![curr.pos]) &&
         !stop &&
-        (curr.pos === curr.line.length - 1 ||
-          isWhiteSpaceString(curr.line[curr.pos + 1]))
+        (curr.pos === curr.line!.length - 1 ||
+          isWhiteSpaceString(curr.line![curr.pos + 1]))
       ) {
         stop = true;
       }
@@ -928,7 +952,7 @@ function findSentence(
           Set the position to the last non whitespace character on the last
           valid line in the case that we reach the end of the document.
         */
-    line = adapter.getLine(last_valid.ln);
+    line = adapter.getLine(last_valid.ln!);
     last_valid.pos = 0;
     for (let i = line.length - 1; i >= 0; --i) {
       if (!isWhiteSpaceString(line[i])) {
@@ -961,7 +985,7 @@ function findSentence(
 
     let last_valid: Pick<Index, "ln" | "pos"> = {
       ln: curr.ln,
-      pos: null,
+      pos: undefined,
     };
 
     let skip_empty_lines = curr.line === "";
@@ -969,16 +993,16 @@ function findSentence(
     // Move one step to skip character we start on
     nextChar(adapter, curr);
 
-    while (curr.line !== null) {
+    while (curr.line !== undefined && curr.pos !== undefined) {
       if (curr.line === "" && !skip_empty_lines) {
-        if (last_valid.pos !== null) {
+        if (last_valid.pos !== undefined) {
           return last_valid;
         } else {
           return { ln: curr.ln, pos: curr.pos };
         }
       } else if (
         isEndOfSentenceSymbol(curr.line[curr.pos]) &&
-        last_valid.pos !== null &&
+        last_valid.pos !== undefined &&
         !(curr.ln === last_valid.ln && curr.pos + 1 === last_valid.pos)
       ) {
         return last_valid;
@@ -994,7 +1018,7 @@ function findSentence(
           Set the position to the first non whitespace character on the last
           valid line in the case that we reach the beginning of the document.
         */
-    line = adapter.getLine(last_valid.ln);
+    line = adapter.getLine(last_valid.ln!);
     last_valid.pos = 0;
     for (let i = 0; i < line.length; ++i) {
       if (!isWhiteSpaceString(line[i])) {
@@ -1012,14 +1036,14 @@ function findSentence(
 
   while (repeat > 0) {
     if (dir < 0) {
-      curr_index = reverse(adapter, curr_index.ln, curr_index.pos, dir);
+      curr_index = reverse(adapter, curr_index.ln!, curr_index.pos!, dir);
     } else {
-      curr_index = forward(adapter, curr_index.ln, curr_index.pos, dir);
+      curr_index = forward(adapter, curr_index.ln!, curr_index.pos!, dir);
     }
     repeat--;
   }
 
-  return makePos(curr_index.ln, curr_index.pos);
+  return makePos(curr_index.ln!, curr_index.pos!);
 }
 
 // TODO: perhaps this finagling of start and end positions belongs
@@ -1106,7 +1130,7 @@ function findBeginningAndEnd(
   const chars = line.split("");
   const firstIndex = chars.indexOf(symb);
 
-  let end: number;
+  let end: number | undefined = undefined;
   // the decision tree is to always look backwards for the beginning first,
   // but if the cursor is in front of the first instance of the symb,
   // then move the cursor forward
@@ -1121,7 +1145,7 @@ function findBeginningAndEnd(
     --cur.ch; // make sure to look backwards
   }
 
-  let start: number;
+  let start: number | undefined = undefined;
 
   // if we're currently on the symbol, we've got a start
   if (chars[cur.ch] == symb && !end) {
@@ -1160,8 +1184,9 @@ function findBeginningAndEnd(
 
 function recordLastCharacterSearch(increment: number, args: MotionArgs) {
   vimGlobalState.lastCharacterSearch.increment = increment;
-  vimGlobalState.lastCharacterSearch.forward = args.forward;
-  vimGlobalState.lastCharacterSearch.selectedCharacter = args.selectedCharacter;
+  vimGlobalState.lastCharacterSearch.forward = !!args.forward;
+  vimGlobalState.lastCharacterSearch.selectedCharacter =
+    args.selectedCharacter!;
 }
 
 /**
@@ -1336,7 +1361,7 @@ const findSymbolModes: Record<SymbolMode, SymbolModeHandler> = {
     },
     isComplete: function (state) {
       if (state.nextCh === "#") {
-        const token = state.lineText.match(/^#(\w+)/)[1];
+        const token = state.lineText.match(/^#(\w+)/)![1];
         if (token === "endif") {
           if (state.forward && state.depth === 0) {
             return true;

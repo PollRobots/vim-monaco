@@ -1,6 +1,7 @@
 import EditorAdapter from "./adapter";
-import { VimState, vimGlobalState } from "./keymap_vim";
+import { vimGlobalState } from "./global";
 import { StringStream } from "./string-stream";
+import { VimState } from "./types";
 
 export class SearchOverlay {
   query: RegExp;
@@ -42,7 +43,7 @@ export class SearchOverlay {
 }
 
 export class SearchState {
-  searchOverlay: SearchOverlay;
+  searchOverlay?: SearchOverlay;
   annotate: any;
 
   getQuery(): RegExp | undefined {
@@ -54,7 +55,7 @@ export class SearchState {
   getOverlay() {
     return this.searchOverlay;
   }
-  setOverlay(overlay: SearchOverlay) {
+  setOverlay(overlay?: SearchOverlay) {
     this.searchOverlay = overlay;
   }
   isReversed() {

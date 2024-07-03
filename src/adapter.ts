@@ -4,14 +4,10 @@
 import { IPosition, IRange, ISelection } from "monaco-editor";
 import monaco from "monaco-editor";
 import { SecInfoOptions, ModeChangeEvent } from "./statusbar";
-import { v4 as uuidv4 } from "uuid";
 import { ExCommandOptionalParameters } from "./keymap_vim";
 import { Pos, getEventKeyName, makePos } from "./common";
 
 const SelectionDirection = window.monaco.SelectionDirection;
-
-const nonASCIISingleCaseWordChar =
-  /[\u00df\u0587\u0590-\u05f4\u0600-\u06ff\u3040-\u309f\u30a0-\u30ff\u3400-\u4db5\u4e00-\u9fcc\uac00-\ud7af]/;
 
 export class CmSelection {
   /// Where the selection started from
@@ -155,7 +151,13 @@ export default class EditorAdapter {
 
     if (found === false) return "nothing";
     if (found === "...") return "multi";
-    if (found != null && handle(found as string)) return "handled";
+    if (
+      found !== null &&
+      found !== undefined &&
+      handle &&
+      handle(found as string)
+    )
+      return "handled";
 
     if (map.fallthrough) {
       if (!Array.isArray(map.fallthrough))
@@ -182,7 +184,7 @@ export default class EditorAdapter {
   initialCursorWidth: number = 0;
   decorations: Map<string, monaco.editor.IEditorDecorationsCollection> =
     new Map();
-  theme: string;
+  theme?: string;
 
   constructor(editor: monaco.editor.IStandaloneCodeEditor) {
     this.editor = editor;
@@ -191,11 +193,17 @@ export default class EditorAdapter {
   }
 
   attach() {
-    EditorAdapter.keyMap.vim.attach(this);
+    const vim = EditorAdapter.keyMap["vim"];
+    if (vim && vim.attach) {
+      vim.attach(this);
+    }
   }
 
   detach() {
-    EditorAdapter.keyMap.vim.detach(this);
+    const vim = EditorAdapter.keyMap["vim"];
+    if (vim && vim.detach) {
+      vim.detach(this);
+    }
   }
 
   addLocalListeners() {
@@ -230,7 +238,7 @@ export default class EditorAdapter {
 
     const keymap = this.state.keyMap as string;
     if (EditorAdapter.keyMap[keymap] && EditorAdapter.keyMap[keymap].call) {
-      const cmd = EditorAdapter.keyMap[keymap].call(key, this);
+      const cmd = EditorAdapter.keyMap[keymap]!.call!(key, this);
       if (cmd) {
         e.preventDefault();
         e.stopPropagation();
@@ -247,7 +255,7 @@ export default class EditorAdapter {
   handleReplaceMode(key: string, e: monaco.IKeyboardEvent) {
     let fromReplace = false;
     let char = key;
-    const pos = this.editor.getPosition();
+    const pos = this.getPos_();
     let range = makeRange(
       pos.lineNumber,
       pos.column,
@@ -287,7 +295,7 @@ export default class EditorAdapter {
     }
 
     if (!fromReplace) {
-      this.replaceStack.push(this.editor.getModel().getValueInRange(range));
+      this.replaceStack.push(this.getModel_().getValueInRange(range));
     }
 
     this.editor.executeEdits("vim", [
@@ -304,12 +312,10 @@ export default class EditorAdapter {
   }
 
   handleCursorChange(e: monaco.editor.ICursorPositionChangedEvent) {
-    const selection = this.editor.getSelection();
+    const selection = this.getSelection_();
 
     if (!this.ctxInsert.get() && e.source === "mouse" && selection.isEmpty()) {
-      const maxCol = this.editor
-        .getModel()
-        .getLineMaxColumn(e.position.lineNumber);
+      const maxCol = this.getModel_().getLineMaxColumn(e.position.lineNumber);
 
       if (e.position.column === maxCol) {
         this.editor.setPosition(
@@ -368,7 +374,7 @@ export default class EditorAdapter {
       case "firstLineNumber":
         return this.firstLine() + 1;
       case "indentWithTabs":
-        return !this.editor.getModel().getOptions().insertSpaces;
+        return !this.getModel_().getOptions().insertSpaces;
       case "theme":
         if (this.theme) {
           return this.theme;
@@ -464,7 +470,7 @@ export default class EditorAdapter {
   }
 
   lineCount() {
-    return this.editor.getModel().getLineCount();
+    return this.getModel_().getLineCount();
   }
 
   defaultTextHeight() {
@@ -475,14 +481,14 @@ export default class EditorAdapter {
     if (line < 0) {
       return "";
     }
-    const model = this.editor.getModel();
+    const model = this.getModel_();
     const maxLines = model.getLineCount();
 
     if (line + 1 > maxLines) {
       line = maxLines - 1;
     }
 
-    return this.editor.getModel().getLineContent(line + 1);
+    return this.getModel_().getLineContent(line + 1);
   }
 
   getAnchorForSelection(sel: ISelection) {
@@ -509,10 +515,10 @@ export default class EditorAdapter {
 
   getCursor(type: string | null = null) {
     if (!type) {
-      return toAdapterPos(this.editor.getPosition());
+      return toAdapterPos(this.getPos_());
     }
 
-    const sel = this.editor.getSelection();
+    const sel = this.getSelection_();
     let pos;
 
     if (sel.isEmpty()) {
@@ -530,13 +536,12 @@ export default class EditorAdapter {
     const p1 = toMonacoPos(start);
     const p2 = toMonacoPos(end);
 
-    return this.editor.getModel().getValueInRange(makeRange(p1, p2));
+    return this.getModel_().getValueInRange(makeRange(p1, p2));
   }
 
   getSelection() {
-    return this.editor
-      .getSelections()
-      .map((sel) => this.editor.getModel().getValueInRange(sel))
+    return this.getSelections_()
+      .map((sel) => this.getModel_().getValueInRange(sel))
       .join("\n");
   }
 
@@ -563,17 +568,17 @@ export default class EditorAdapter {
   setCursor(line: number | Pos, ch: number) {
     const pos = typeof line === "number" ? makePos(line, ch) : line;
 
-    const monacoPos = this.editor.getModel().validatePosition(toMonacoPos(pos));
+    const monacoPos = this.getModel_().validatePosition(toMonacoPos(pos));
     this.editor.setPosition(toMonacoPos(pos));
     this.editor.revealPosition(monacoPos);
   }
 
   somethingSelected() {
-    return !this.editor.getSelection().isEmpty();
+    return !this.getSelection_().isEmpty();
   }
 
   listSelections(): CmSelection[] {
-    const selections = this.editor.getSelections();
+    const selections = this.getSelections_();
 
     if (!selections.length) {
       return [
@@ -595,7 +600,7 @@ export default class EditorAdapter {
   }
 
   setSelections(selections: CmSelection[], primIndex?: number) {
-    const hasSel = !!this.editor.getSelections().length;
+    const hasSel = !!this.getSelections_().length;
     const sels = selections.map((sel, index) => {
       const { anchor, head } = sel;
 
@@ -634,14 +639,13 @@ export default class EditorAdapter {
   }
 
   getSelections() {
-    const { editor } = this;
-    return editor
-      .getSelections()
-      .map((sel) => editor.getModel().getValueInRange(sel));
+    return this.getSelections_().map((sel) =>
+      this.getModel_().getValueInRange(sel)
+    );
   }
 
   replaceSelections(texts: string[]) {
-    this.editor.getSelections().forEach((sel, index) => {
+    this.getSelections_().forEach((sel, index) => {
       this.editor.executeEdits("vim", [
         {
           range: sel,
@@ -676,7 +680,7 @@ export default class EditorAdapter {
   }
 
   clipPos(p: Pos) {
-    const pos = this.editor.getModel().validatePosition(toMonacoPos(p));
+    const pos = this.getModel_().validatePosition(toMonacoPos(p));
     return toAdapterPos(pos);
   }
 
@@ -691,13 +695,12 @@ export default class EditorAdapter {
   }
 
   getScrollInfo() {
-    const { editor } = this;
-    const [range] = editor.getVisibleRanges();
+    const [range] = this.editor.getVisibleRanges();
 
     return {
       left: 0,
       top: range.startLineNumber - 1,
-      height: editor.getModel().getLineCount(),
+      height: this.getModel_().getLineCount(),
       clientHeight: range.endLineNumber - range.startLineNumber + 1,
     };
   }
@@ -710,9 +713,7 @@ export default class EditorAdapter {
     this.dispatch("dispose");
     this.removeOverlay();
 
-    if (EditorAdapter.keyMap.vim) {
-      EditorAdapter.keyMap.vim.detach(this);
-    }
+    this.detach();
 
     this.disposables.forEach((d) => d.dispose());
   }
@@ -805,23 +806,23 @@ export default class EditorAdapter {
   }
 
   findFirstNonWhiteSpaceCharacter(line: number) {
-    return this.editor.getModel().getLineFirstNonWhitespaceColumn(line + 1) - 1;
+    return this.getModel_().getLineFirstNonWhitespaceColumn(line + 1) - 1;
   }
 
-  scrollTo(x: number, y: number) {
+  scrollTo(x?: number, y?: number) {
     if (!x && !y) {
       return;
     }
     if (!x) {
-      if (y < 0) {
-        y = this.editor.getPosition().lineNumber - y;
+      if (y! < 0) {
+        y = this.getPos_().lineNumber - y!;
       }
-      this.editor.setScrollTop(this.editor.getTopForLineNumber(y + 1));
+      this.editor.setScrollTop(this.editor.getTopForLineNumber(y! + 1));
     }
   }
 
   moveCurrentLineTo(viewPosition: "top" | "center" | "bottom") {
-    const pos = this.editor.getPosition();
+    const pos = this.getPos_();
     const range = makeRange(pos, pos);
 
     switch (viewPosition) {
@@ -869,12 +870,12 @@ export default class EditorAdapter {
 
     const monacoPos = toMonacoPos(pos);
     const context = this;
-    const { editor } = this;
     let lastSearch: IRange;
-    const model = editor.getModel();
+    const model = this.getModel_();
     const matches =
       model.findMatches(query, false, isRegex, matchCase, null, false) || [];
 
+    const capturedEditor = this.editor;
     return {
       getMatches() {
         return matches;
@@ -963,7 +964,7 @@ export default class EditorAdapter {
       },
       replace(text: string) {
         if (lastSearch) {
-          editor.executeEdits(
+          capturedEditor.executeEdits(
             "vim",
             [
               {
@@ -981,7 +982,7 @@ export default class EditorAdapter {
               return null;
             }
           );
-          editor.setPosition(liftRange(lastSearch).getStartPosition());
+          capturedEditor.setPosition(liftRange(lastSearch).getStartPosition());
         }
       },
     };
@@ -1018,16 +1019,14 @@ export default class EditorAdapter {
       query = query.source;
     }
 
-    const match = this.editor
-      .getModel()
-      .findNextMatch(
-        query as string,
-        this.editor.getPosition(),
-        isRegex,
-        matchCase,
-        null,
-        false
-      );
+    const match = this.getModel_().findNextMatch(
+      query as string,
+      this.getPos_(),
+      isRegex,
+      matchCase,
+      null,
+      false
+    );
 
     if (!match || !match.range) {
       return;
@@ -1056,13 +1055,13 @@ export default class EditorAdapter {
     if (units !== "char") {
       return;
     }
-    const pos = this.editor.getPosition();
+    const pos = this.getPos_();
     this.editor.setPosition(pos.delta(0, amount));
   }
 
   scanForBracket(pos: Pos, dir: number, bracketRegex: RegExp) {
     let searchPos = toMonacoPos(pos);
-    const model = this.editor.getModel();
+    const model = this.getModel_();
 
     const query = bracketRegex.source;
 
@@ -1082,11 +1081,11 @@ export default class EditorAdapter {
       }
 
       const match = searchFunc(searchPos);
-      const thisBracket = match.matches[0];
-
-      if (match === undefined) {
+      if (!match) {
         return undefined;
       }
+
+      const thisBracket = match.matches![0];
 
       const matchingBracket = kMatchingBrackets[thisBracket];
 
@@ -1114,11 +1113,11 @@ export default class EditorAdapter {
   }
 
   indexFromPos(pos: Pos) {
-    return this.editor.getModel().getOffsetAt(toMonacoPos(pos));
+    return this.getModel_().getOffsetAt(toMonacoPos(pos));
   }
 
   posFromIndex(offset: number) {
-    return toAdapterPos(this.editor.getModel().getPositionAt(offset));
+    return toAdapterPos(this.getModel_().getPositionAt(offset));
   }
 
   indentLine(line: number, indentRight: boolean = true) {
@@ -1137,7 +1136,7 @@ export default class EditorAdapter {
         },
       ]);
     } else {
-      const model = this.editor.getModel();
+      const model = this.getModel_();
 
       const range = makeRange(line + 1, 1, line + 1, tabWidth);
       const begin = model.getValueInRange(range);
@@ -1176,7 +1175,7 @@ export default class EditorAdapter {
   }
 
   displayMessage(message: string): () => void {
-    const id = uuidv4();
+    const id = window.crypto.randomUUID();
     this.dispatch("status-display", message, id);
     return () => {
       this.dispatch("status-close-display", id);
@@ -1188,7 +1187,7 @@ export default class EditorAdapter {
     desc: string,
     options: SecInfoOptions
   ): () => void {
-    const id = uuidv4();
+    const id = window.crypto.randomUUID();
     this.dispatch("status-prompt", prefix, desc, options, id);
     return () => {
       this.dispatch("status-close-prompt", id);
@@ -1202,16 +1201,16 @@ export default class EditorAdapter {
   smartIndent() {
     // Only works if a formatter is added for the current language.
     // reindentselectedlines does not work here.
-    this.editor.getAction("editor.action.formatSelection").run();
+    this.editor.getAction("editor.action.formatSelection")!.run();
   }
 
   moveCursorTo(to: "start" | "end") {
-    const pos = this.editor.getPosition();
+    const pos = this.getPos_();
 
     if (to === "start") {
       this.editor.setPosition(makePosition(pos.lineNumber, 1));
     } else if (to === "end") {
-      const maxColumn = this.editor.getModel().getLineMaxColumn(pos.lineNumber);
+      const maxColumn = this.getModel_().getLineMaxColumn(pos.lineNumber);
       this.editor.setPosition(makePosition(pos.lineNumber, maxColumn));
     }
   }
@@ -1228,6 +1227,22 @@ export default class EditorAdapter {
         this.smartIndent();
         break;
     }
+  }
+
+  getModel_() {
+    return this.editor.getModel()!;
+  }
+
+  getPos_() {
+    return this.editor.getPosition()!;
+  }
+
+  getSelection_() {
+    return this.editor.getSelection()!;
+  }
+
+  getSelections_() {
+    return this.editor.getSelections()!;
   }
 }
 
@@ -1257,8 +1272,8 @@ function makeRange(
   return {
     startLineNumber: startLine as number,
     startColumn: startColumn as number,
-    endLineNumber: endLine,
-    endColumn: endColumn,
+    endLineNumber: endLine!,
+    endColumn: endColumn!,
   };
 }
 

@@ -25,7 +25,7 @@ export interface SecInfoOptions {
     text: string,
     close: (value?: string) => void
   ) => void;
-  onClose?: (value?: string) => void;
+  onClose?: (value: string) => void;
   bottom?: boolean;
   selectValueOnOpen?: boolean;
   value?: string;
@@ -54,9 +54,9 @@ export class StatusBar implements IStatusBar {
   secInfoNode: HTMLSpanElement;
   notifNode: HTMLSpanElement;
   keyInfoNode: HTMLSpanElement;
-  setFocus: () => void;
+  setFocus?: () => void;
   input?: StatusBarInput;
-  notifTimeout: ReturnType<typeof setTimeout> = undefined;
+  notifTimeout?: ReturnType<typeof setTimeout> = undefined;
 
   constructor(node: HTMLElement, setFocus?: () => void) {
     this.node = node;
@@ -186,7 +186,7 @@ export class StatusBar implements IStatusBar {
 
   closeInput() {
     this.removeInputListeners();
-    this.input = null;
+    this.input = undefined;
     this.setSec(document.createTextNode(""));
 
     if (this.setFocus) {
@@ -199,22 +199,32 @@ export class StatusBar implements IStatusBar {
   }
 
   inputKeyUp(e: KeyboardEvent) {
-    const { options, node: input } = this.input;
-    if (options && options.onKeyUp) {
+    const { options, node: input } = this.input || {};
+    if (options && options.onKeyUp && input) {
       options.onKeyUp(e, input.value, () => this.closeInput());
     }
   }
 
   inputBlur() {
+    if (!this.input) {
+      return;
+    }
     const { options } = this.input;
 
-    if (options.closeOnBlur) {
+    if (options!.closeOnBlur) {
       this.closeInput();
     }
   }
 
   inputKeyDown(e: KeyboardEvent) {
+    if (!this.input) {
+      return;
+    }
     const { options, node: input } = this.input;
+
+    if (!options) {
+      return;
+    }
 
     if (options && options.onKeyDown) {
       if (options.onKeyDown(e, input.value, () => this.closeInput())) {
@@ -226,7 +236,7 @@ export class StatusBar implements IStatusBar {
       e.key === "Escape" ||
       (options && options.closeOnEnter !== false && e.key === "Enter")
     ) {
-      this.input.node.blur();
+      this.input!.node.blur();
       e.stopPropagation();
       this.closeInput();
     }
@@ -239,6 +249,9 @@ export class StatusBar implements IStatusBar {
   }
 
   addInputListeners() {
+    if (!this.input) {
+      return;
+    }
     this.input.node.addEventListener("keyup", this.input.keyUpHandler);
     this.input.node.addEventListener("keydown", this.input.keyDownHandler);
     this.input.node.addEventListener("blur", this.input.blurHandler);

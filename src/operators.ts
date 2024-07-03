@@ -7,15 +7,10 @@ import {
   isUpperCase,
   makePos,
 } from "./common";
-import {
-  OperatorArgs,
-  VimState,
-  offsetCursor,
-  vimGlobalState,
-  lineLength,
-  clipCursorToContent,
-} from "./keymap_vim";
+import { vimGlobalState } from "./global";
+import { offsetCursor, lineLength, clipCursorToContent } from "./keymap_vim";
 import { motions } from "./motions";
+import { OperatorArgs, VimState } from "./types";
 
 /**
  * An operator acts on a text selection. It receives the list of selections
@@ -82,7 +77,7 @@ export const operators: Record<string, OperatorFunc> = {
       finalHead = cursorMin(ranges[0].head, ranges[0].anchor);
     }
     vimGlobalState.registerController.pushText(
-      args.registerName,
+      args.registerName!,
       "change",
       text,
       args.linewise,
@@ -121,13 +116,14 @@ export const operators: Record<string, OperatorFunc> = {
       adapter.replaceRange("", anchor, head);
       finalHead = anchor;
       if (args.linewise) {
+        const vim = adapter.state.vim as VimState;
         const res = motions.moveToFirstNonWhiteSpaceCharacter(
           adapter,
           anchor,
           {},
-          undefined,
-          undefined
-        );
+          vim,
+          vim.inputState
+        )!;
         finalHead = Array.isArray(res) ? res[0] : res;
       }
     } else {
@@ -137,7 +133,7 @@ export const operators: Record<string, OperatorFunc> = {
       finalHead = cursorMin(ranges[0].head, ranges[0].anchor);
     }
     vimGlobalState.registerController.pushText(
-      args.registerName,
+      args.registerName!,
       "delete",
       text,
       args.linewise,
@@ -172,18 +168,19 @@ export const operators: Record<string, OperatorFunc> = {
       ranges[0].anchor,
       {},
       vim,
-      undefined
+      vim.inputState
     );
     return Array.isArray(res) ? res[0] : res;
   },
   indentAuto: function (adapter, _args, ranges) {
     adapter.execCommand("indentAuto");
+    const vim = adapter.state.vim as VimState;
     const res = motions.moveToFirstNonWhiteSpaceCharacter(
       adapter,
       ranges[0].anchor,
       {},
-      undefined,
-      undefined
+      vim,
+      vim.inputState
     );
     return Array.isArray(res) ? res[0] : res;
   },
@@ -214,12 +211,13 @@ export const operators: Record<string, OperatorFunc> = {
       args.linewise &&
       ranges[0].anchor.line + 1 == ranges[0].head.line
     ) {
+      const vim = adapter.state.vim as VimState;
       const res = motions.moveToFirstNonWhiteSpaceCharacter(
         adapter,
         oldAnchor,
         {},
-        undefined,
-        undefined
+        vim,
+        vim.inputState
       );
       return Array.isArray(res) ? res[0] : res;
     } else if (args.linewise) {
@@ -233,14 +231,14 @@ export const operators: Record<string, OperatorFunc> = {
     const text = adapter.getSelection();
     const endPos = vim.visualMode
       ? cursorMin(
-          vim.sel.anchor,
-          vim.sel.head,
+          vim.sel!.anchor,
+          vim.sel!.head,
           ranges[0].head,
           ranges[0].anchor
         )
       : oldAnchor;
     vimGlobalState.registerController.pushText(
-      args.registerName,
+      args.registerName!,
       "yank",
       text,
       args.linewise,

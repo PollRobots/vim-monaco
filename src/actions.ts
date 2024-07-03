@@ -9,10 +9,8 @@ import {
   findFirstNonWhiteSpaceCharacter,
   cursorEqual,
 } from "./common";
+import { vimGlobalState } from "./global";
 import {
-  ActionArgs,
-  VimState,
-  vimGlobalState,
   lineLength,
   offsetCursor,
   exitVisualMode,
@@ -30,6 +28,7 @@ import {
 } from "./keymap_vim";
 import { MacroModeState } from "./macro-mode-state";
 import { motions } from "./motions";
+import { ActionArgs, VimState } from "./types";
 
 export type ActionFunc = (
   adapter: EditorAdapter,
@@ -66,10 +65,10 @@ export const actions: Record<string, ActionFunc> = {
         cursor.line = Math.ceil(cursor.line);
         adapter.setCursor(cursor);
         cursorCoords = adapter.charCoords(cursor, "local");
-        adapter.scrollTo(null, cursorCoords.top);
+        adapter.scrollTo(undefined, cursorCoords.top);
       } else {
         // Cursor stays within bounds.  Just reposition the scroll window.
-        adapter.scrollTo(null, newPos);
+        adapter.scrollTo(undefined, newPos);
       }
     } else {
       // TODO: none of this can work becauso cursorCoords doesn't have bottom
@@ -87,14 +86,14 @@ export const actions: Record<string, ActionFunc> = {
       //  // Cursor stays within bounds.  Just reposition the scroll window.
       //  adapter.scrollTo(null, newPos);
       //}
-      adapter.scrollTo(null, newPos);
+      adapter.scrollTo(undefined, newPos);
     }
   },
   scrollToCursor: function (adapter, actionArgs) {
     if (actionArgs.position) {
       adapter.moveCurrentLineTo(actionArgs.position);
     } else {
-      adapter.scrollTo(null, adapter.getCursor().line);
+      adapter.scrollTo(undefined, adapter.getCursor().line);
     }
   },
   replayMacro: function (adapter, actionArgs, vim) {
@@ -107,12 +106,12 @@ export const actions: Record<string, ActionFunc> = {
       macroModeState.latestRegister = registerName;
     }
     while (repeat--) {
-      executeMacroRegister(adapter, vim, macroModeState, registerName);
+      executeMacroRegister(adapter, vim, macroModeState, registerName!);
     }
   },
   enterMacroRecordMode: function (adapter, actionArgs) {
     const macroModeState = vimGlobalState.macroModeState;
-    const registerName = actionArgs.selectedCharacter;
+    const registerName = actionArgs.selectedCharacter!;
     if (vimGlobalState.registerController.isValidRegister(registerName)) {
       macroModeState.enterMacroRecordMode(adapter, registerName);
     }
@@ -149,9 +148,9 @@ export const actions: Record<string, ActionFunc> = {
         adapter,
         head,
         {},
-        undefined,
-        undefined
-      );
+        vim,
+        vim.inputState
+      )!;
       head = Array.isArray(res) ? res[0] : res;
     } else if (insertAt == "startOfSelectedArea") {
       if (!vim.visualMode) return;
@@ -212,7 +211,7 @@ export const actions: Record<string, ActionFunc> = {
     selectForInsert(adapter, head, height);
   },
   toggleVisualMode: function (adapter, actionArgs, vim) {
-    const repeat = actionArgs.repeat;
+    const repeat = actionArgs.repeat!;
     const anchor = adapter.getCursor();
     let head: Pos;
     // TODO: The repeat should actually select number of characters/lines
@@ -302,7 +301,7 @@ export const actions: Record<string, ActionFunc> = {
       curEnd.ch = lineLength(adapter, curEnd.line) - 1;
     } else {
       // Repeat is the number of lines to join. Minimum 2 lines.
-      const repeat = Math.max(actionArgs.repeat, 2);
+      const repeat = Math.max(actionArgs.repeat!, 2);
       curStart = adapter.getCursor();
       curEnd = clipCursorToContent(
         adapter,
@@ -352,7 +351,7 @@ export const actions: Record<string, ActionFunc> = {
   paste: function (adapter, actionArgs, vim) {
     const cur = copyCursor(adapter.getCursor());
     const register = vimGlobalState.registerController.getRegister(
-      actionArgs.registerName
+      actionArgs.registerName!
     );
     let text: string = register.toString();
     let blockText: string[] = [];
@@ -368,11 +367,11 @@ export const actions: Record<string, ActionFunc> = {
         return tabs * tabSize + spaces * 1;
       };
       const currentLine = adapter.getLine(adapter.getCursor().line);
-      const indent = whitespaceLength(currentLine.match(/^\s*/)[0]);
+      const indent = whitespaceLength(currentLine.match(/^\s*/)![0]);
       // chomp last newline b/c don't want it to match /^\s*/gm
       const chompedText = text.replace(/\n$/, "");
       const wasChomped = text !== chompedText;
-      const firstIndent = whitespaceLength(text.match(/^\s*/)[0]);
+      const firstIndent = whitespaceLength(text.match(/^\s*/)![0]);
       text = chompedText.replace(/^\s*/gm, (wspace: string) => {
         const newIndent = indent + (whitespaceLength(wspace) - firstIndent);
         if (newIndent < 0) {
@@ -386,8 +385,8 @@ export const actions: Record<string, ActionFunc> = {
       });
       text += wasChomped ? "\n" : "";
     }
-    if (actionArgs.repeat > 1) {
-      text = Array(actionArgs.repeat + 1).join(text);
+    if (actionArgs.repeat! > 1) {
+      text = Array(actionArgs.repeat! + 1).join(text);
     }
     const linewise = register.linewise;
     const blockwise = register.blockwise;
@@ -420,7 +419,7 @@ export const actions: Record<string, ActionFunc> = {
     if (vim.visualMode) {
       //  save the pasted text for reselection if the need arises
       vim.lastPastedText = text;
-      let lastSelectionCurEnd: Pos;
+      let lastSelectionCurEnd: Pos | undefined;
       const selectedArea = getSelectedAreaRange(adapter, vim);
       const selectionStart = selectedArea[0];
       let selectionEnd = selectedArea[1];
@@ -457,7 +456,7 @@ export const actions: Record<string, ActionFunc> = {
         );
       }
       // restore the the curEnd marker
-      if (lastSelectionCurEnd) {
+      if (vim.lastSelection && lastSelectionCurEnd) {
         vim.lastSelection.headMark = adapter.setBookmark(lastSelectionCurEnd);
       }
       if (linewise) {
@@ -510,14 +509,14 @@ export const actions: Record<string, ActionFunc> = {
   undo: function (adapter, actionArgs) {
     repeatFn(
       () => EditorAdapter.commands.undo(adapter, {}),
-      actionArgs.repeat
+      actionArgs.repeat!
     )();
     adapter.setCursor(adapter.getCursor("anchor"));
   },
   redo: function (adapter, actionArgs) {
     repeatFn(
       () => EditorAdapter.commands.redo(adapter, {}),
-      actionArgs.repeat
+      actionArgs.repeat!
     )();
   },
   setRegister: function (adapter, actionArgs, vim) {
@@ -533,11 +532,11 @@ export const actions: Record<string, ActionFunc> = {
     }
   },
   setMark: function (adapter, actionArgs, vim) {
-    const markName = actionArgs.selectedCharacter;
+    const markName = actionArgs.selectedCharacter!;
     updateMark(adapter, vim, markName, adapter.getCursor());
   },
   replace: function (adapter, actionArgs, vim) {
-    const replaceWith = actionArgs.selectedCharacter;
+    const replaceWith = actionArgs.selectedCharacter!;
     let curStart = adapter.getCursor();
     let replaceTo: number;
     let curEnd: Pos;
@@ -547,7 +546,7 @@ export const actions: Record<string, ActionFunc> = {
       curEnd = adapter.getCursor("end");
     } else {
       const line = adapter.getLine(curStart.line);
-      replaceTo = curStart.ch + actionArgs.repeat;
+      replaceTo = curStart.ch + actionArgs.repeat!;
       if (replaceTo > line.length) {
         replaceTo = line.length;
       }
@@ -598,24 +597,24 @@ export const actions: Record<string, ActionFunc> = {
       "": 10,
       "0x": 16,
     };
-    let match: RegExpExecArray;
-    let start: number;
-    let end: number;
+    let match: RegExpExecArray | null;
+    let start: number | undefined;
+    let end: number | undefined;
     while ((match = re.exec(lineStr)) !== null) {
       start = match.index;
       end = start + match[0].length;
       if (cur.ch < end) break;
     }
-    if (!actionArgs.backtrack && end <= cur.ch) return;
-    if (!match) {
+    if (!match || !end || !start) {
       return;
     }
+    if (!actionArgs.backtrack && end <= cur.ch) return;
     const baseStr = match[2] || match[4];
     const digits = match[3] || match[5];
     const increment = actionArgs.increase ? 1 : -1;
     const base = bases[baseStr.toLowerCase()] || 10;
     const number =
-      parseInt(match[1] + digits, base) + increment * actionArgs.repeat;
+      parseInt(match[1] + digits, base) + increment * actionArgs.repeat!;
     let numberStr = number.toString(base);
     const zeroPadding = baseStr
       ? new Array(digits.length - numberStr.length + 1 + match[1].length).join(
@@ -640,11 +639,11 @@ export const actions: Record<string, ActionFunc> = {
     }
     let repeat = actionArgs.repeat;
     if (repeat && actionArgs.repeatIsExplicit) {
-      vim.lastEditInputState.repeatOverride = repeat;
+      vim.lastEditInputState!.repeatOverride = repeat;
     } else {
-      repeat = vim.lastEditInputState.repeatOverride || repeat;
+      repeat = vim.lastEditInputState!.repeatOverride || repeat;
     }
-    repeatLastEdit(adapter, vim, repeat, false /** repeatForInsert */);
+    repeatLastEdit(adapter, vim, repeat!, false /** repeatForInsert */);
   },
   indent: function (adapter, actionArgs) {
     adapter.indentLine(adapter.getCursor().line, actionArgs.indentRight);
@@ -682,7 +681,7 @@ function executeMacroRegister(
     while (text) {
       // Pull off one command key, which is either a single character
       // or a special sequence wrapped in '<' and '>', e.g. '<Space>'.
-      match = /<\w+-.+?>|<\w+>|./.exec(text);
+      match = /<\w+-.+?>|<\w+>|./.exec(text)!;
       key = match[0];
       text = text.substring(match.index + key.length);
       vimApi.handleKey(adapter, key, "macro");
@@ -701,7 +700,7 @@ function getSelectedAreaRange(
   adapter: EditorAdapter,
   vim: VimState
 ): [Pos, Pos] {
-  const lastSelection = vim.lastSelection;
+  const lastSelection = vim.lastSelection!;
   const getCurrentSelectedAreaRange = (): [Pos, Pos] => {
     const selections = adapter.listSelections();
     const start = selections[0];

@@ -3,6 +3,7 @@ import * as StatusBar from "./statusbar";
 import EditorAdapter from "./adapter";
 import { initVimAdapter, vimApi } from "./keymap_vim";
 import * as Registers from "./register-controller";
+import { VimOptions } from "./types";
 
 export type IRegister = Registers.IRegister;
 export type IStatusBar = StatusBar.IStatusBar;
@@ -76,9 +77,11 @@ export class VimMode implements EventTarget {
       this.dispatchEvent(new Event("clipboard"));
     });
 
-    if (this.statusBar_) {
+    if (this.statusBar_ !== undefined) {
+      const statusBar = this.statusBar_;
+
       this.adapter_.on("vim-mode-change", (mode) => {
-        this.statusBar_.setMode(mode);
+        statusBar.setMode(mode);
       });
 
       this.adapter_.on("vim-keypress", (key) => {
@@ -87,16 +90,16 @@ export class VimMode implements EventTarget {
         } else {
           this.keyBuffer_ += key;
         }
-        this.statusBar_.setKeyBuffer(this.keyBuffer_);
+        statusBar.setKeyBuffer(this.keyBuffer_);
       });
 
       this.adapter_.on("vim-command-done", () => {
         this.keyBuffer_ = "";
-        this.statusBar_.setKeyBuffer(this.keyBuffer_);
+        statusBar.setKeyBuffer(this.keyBuffer_);
       });
 
       this.adapter_.on("status-display", (msg, id) => {
-        const closer = this.statusBar_.setSecStatic(msg);
+        const closer = statusBar.setSecStatic(msg);
         this.closers_.set(id, closer);
       });
 
@@ -109,7 +112,7 @@ export class VimMode implements EventTarget {
       });
 
       this.adapter_.on("status-prompt", (prefix, desc, options, id) => {
-        const closer = this.statusBar_.setSecPrompt(prefix, desc, options);
+        const closer = statusBar.setSecPrompt(prefix, desc, options);
         this.closers_.set(id, closer);
       });
 
@@ -122,13 +125,13 @@ export class VimMode implements EventTarget {
       });
 
       this.adapter_.on("status-notify", (msg) => {
-        this.statusBar_.showNotification(msg);
+        statusBar.showNotification(msg);
       });
 
       this.adapter_.on("dispose", () => {
-        this.statusBar_.toggleVisibility(false);
-        this.statusBar_.closeInput();
-        this.statusBar_.clear();
+        statusBar.toggleVisibility(false);
+        statusBar.closeInput();
+        statusBar.clear();
       });
     }
 
@@ -184,12 +187,22 @@ export class VimMode implements EventTarget {
   }
 
   removeEventListener(
+    type: "open-file" | "save-file",
+    callback: EventHandler<FileEvent>,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+  removeEventListener(
+    type: "clipboard",
+    callback: EventHandler<Event>,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+  removeEventListener(
     type: string,
     callback: EventHandler<Event> | EventHandler<FileEvent>,
     options?: boolean | EventListenerOptions
   ): void {
     const typeListeners = this.listeners_.get(type);
-    if (!typeListeners) {
+    if (typeListeners) {
       const index = typeListeners.lastIndexOf(callback);
       if (index >= 0) {
         typeListeners.splice(index, 1);

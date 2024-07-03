@@ -2,15 +2,19 @@
   "compilerOptions": {
     "outDir": "./dist/",
     "alwaysStrict": true,
+    "strict": true,
     "noImplicitAny": true,
-    "target": "ES2022",
-    "module": "commonjs",
-    "esModuleInterop": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": false,
     "sourceMap": true,
     "jsx": "react",
     "allowSyntheticDefaultImports": true,
-    "lib": ["dom", "ES2022"],
+    "lib": ["dom", "ES2017", "DOM.Iterable"],
+    "removeComments": true,
     "declaration": true
   },
-
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
 }

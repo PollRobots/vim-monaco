@@ -1,21 +1,28 @@
 {
   "name": "vim-monaco",
+  "type": "module",
   "version": "1.0.0",
   "description": "vim mode support for monaco-editor",
-  "types": "dist/index.d.ts",
-  "main": "dist/index.js",
+  "source": "src/index.ts",
+  "exports": "./dist/vim-monaco.modern.js",
+  "types": "./dist/index.d.ts",
+  "main": "dist/vim-monaco.cjs",
+  "module": "dist/vim-monaco.module.js",
+  "unpkg": "dist/vim-monaco.umd.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "clean": "rm -rf dist",
+    "build": "npm run clean && microbundle"
   },
   "keywords": [],
   "author": "Paul C Roberts",
   "license": "MIT",
   "devDependencies": {
-    "@types/uuid": "^10.0.0",
+    "microbundle": "^0.15.1",
     "monaco-editor": "^0.50.0",
-    "typescript": "^5.5.3",
-    "uuid": "^10.0.0"
+    "typescript": "^5.5.3"
   },
   "peerDependencies": {
     "monaco-editor": "0.50.0"

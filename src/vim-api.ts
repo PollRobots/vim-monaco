@@ -5,12 +5,8 @@ import EditorAdapter from "./adapter";
 import { defaultKeymap, defaultKeymapLength } from "./default-key-map";
 import {
   InsertModeKey,
-  resetVimGlobalState,
-  vimGlobalState,
   maybeInitVimState,
-  Context,
   exCommandDispatcher,
-  KeyMapping,
   ExCommandFunc,
   exCommands,
   clearInputState,
@@ -18,8 +14,6 @@ import {
   exitVisualMode,
   exitInsertMode,
   offsetCursor,
-  MappableCommandType,
-  MappableArgType,
   mapCommand,
   _mapCommand,
 } from "./keymap_vim";
@@ -32,11 +26,18 @@ import {
   getOption,
   setOption,
 } from "./options";
+import { resetVimGlobalState, vimGlobalState } from "./global";
+import {
+  Context,
+  KeyMapping,
+  MappableCommandType,
+  MappableArgType,
+} from "./types";
 
 export class VimApi {
-  lastInsertModeKeyTimer: ReturnType<typeof setTimeout>;
+  lastInsertModeKeyTimer?: ReturnType<typeof setTimeout>;
   suppressErrorLogging = false;
-  InsertModeKey: InsertModeKey;
+  InsertModeKey?: InsertModeKey;
 
   constructor() {
     resetVimGlobalState();
@@ -229,6 +230,9 @@ export class VimApi {
         // Pull off one command key, which is either a single character
         // or a special sequence wrapped in '<' and '>', e.g. '<Space>'.
         match = /<\w+-.+?>|<\w+>|./.exec(keys);
+        if (!match) {
+          throw new Error();
+        }
         key = match[0];
         keys = keys.substring(match.index + key.length);
         this.handleKey(adapter, key, "mapping");
@@ -289,7 +293,7 @@ export class VimApi {
         vimGlobalState.macroModeState.lastInsertModeChanges.changes.pop();
       }
       clearInputState(adapter);
-      return match.command;
+      return match.command!;
     };
 
     const handleKeyNonInsertMode = () => {
@@ -331,10 +335,10 @@ export class VimApi {
 
       vim.inputState.keyBuffer = "";
       keysMatcher = /^(\d*)(.*)$/.exec(keys);
-      if (keysMatcher[1] && keysMatcher[1] != "0") {
+      if (keysMatcher && keysMatcher[1] && keysMatcher[1] != "0") {
         vim.inputState.pushRepeatDigit(keysMatcher[1]);
       }
-      return match.command;
+      return match.command!;
     };
 
     const command = vim.insertMode
@@ -352,7 +356,7 @@ export class VimApi {
         adapter.curOp.isVimOp = true;
         try {
           if (command.type == "keyToKey") {
-            doKeyToKey(command.toKeys);
+            doKeyToKey(command.toKeys!);
           } else {
             commandDispatcher.processCommand(adapter, vim, command);
           }
