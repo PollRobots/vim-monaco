@@ -23,7 +23,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && microbundle"
+    "build": "npm run clean && microbundle",
+    "prepublishOnly": "npm run build"
   },
   "author": "Paul C Roberts <pacaro@gmail.com>",
   "license": "MIT",

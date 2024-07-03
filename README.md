@@ -2,7 +2,7 @@
 
 vim mode for use with the [Monaco Editor](https://microsoft.github.io/monaco-editor/)
 
-This package does not include the [monaco-editor](https://npmjs.org/package/monaco-editor). It requires that Monaco has already been loaded, and depends on `window.monaco` having been populated.
+This package does not include the [monaco-editor](https://npmjs.org/package/monaco-editor). It requires that Monaco has already been loaded, and depends on `window.monaco` having been populated. See the `monaco-editor` readme for how to accomplish this.
 
 ### Basic Usage
 
@@ -80,3 +80,12 @@ vimMode.addEventListener("clipboard", () => clipboard.update());
 - `vimMode.disable()` will disable the vim mode. This reverts the editor to its default inferior key bindings.
 - `vimMode.executeCommand(cmd)` can be used to execute a command. For example `set iskeyword+=-` would add '-' to the set of keyword characters (used by `w` `*` etc.)
 - `vimMode.setOption` can be used to set options. One use of this is to set the theme. The vim instance can use the ':colorscheme' command to get and set the theme, but while it can set the theme on the monaco editor instance, it cannot read the current theme name, so calling this on external theme changes will keep the value in sync.
+
+## Acknowledgements
+
+This was based on the [monaco-vim](https://github.com/brijeshb42/monaco-vim)
+package by Brijesh Bittu.
+
+Unfortunately that package didn't work for my needs, it depends on internal
+features of an older version of monaco. So I ported to typescript and made some
+different design decisions to allow me to avoid those dependencies.
