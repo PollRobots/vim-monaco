@@ -1,7 +1,7 @@
 {
   "name": "vim-monaco",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "vim support for monaco-editor",
   "keywords": [
     "monaco-editor",
@@ -27,6 +27,11 @@
     "prepublishOnly": "npm run build"
   },
   "author": "Paul C Roberts <pacaro@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pollrobots/vim-monaco.git"
+  },
+  "homepage": "https://github.com/pollrobots/vim-monaco.git",
   "license": "MIT",
   "devDependencies": {
     "microbundle": "^0.15.1",

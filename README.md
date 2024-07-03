@@ -2,7 +2,9 @@
 
 vim mode for use with the [Monaco Editor](https://microsoft.github.io/monaco-editor/)
 
-This package does not include the [monaco-editor](https://npmjs.org/package/monaco-editor). It requires that Monaco has already been loaded, and depends on `window.monaco` having been populated. See the `monaco-editor` readme for how to accomplish this.
+[![npm version](https://badge.fury.io/js/vim-monaco.svg)](https://npmjs.com/package/vim-monaco)
+
+**Note:** This package does not include the [monaco-editor](https://npmjs.org/package/monaco-editor). It requires that Monaco has already been loaded, and depends on `window.monaco` having been populated. See the `monaco-editor` readme for how to accomplish this.
 
 ### Basic Usage
 
