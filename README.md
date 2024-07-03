@@ -45,6 +45,8 @@ const vimMode = new VimMode(editor, statusBar);
 vimMode.enable();
 ```
 
+[jsfiddle example](https://jsfiddle.net/na4kLj0v/5/)
+
 ### File load and save
 
 By default `:write`, `:edit` and `:save` don't do anything. You can enable this functionality by adding event listeners to the `vimMode` object for the `open-file` and `save-file` events.
