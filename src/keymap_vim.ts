@@ -29,7 +29,7 @@ import EditorAdapter, {
 } from "./adapter";
 import { StringStream } from "./string-stream";
 import { defaultKeymap } from "./default-key-map";
-import { SecInfoOptions } from "./statusbar";
+import { StatusBarInputOptions } from "./statusbar";
 import { VimApi } from "./vim-api";
 import {
   copyCursor,
@@ -938,7 +938,7 @@ export function showConfirm(adapter: EditorAdapter, template: string) {
   adapter.openNotification(template);
 }
 
-interface PromptOptions extends SecInfoOptions {
+interface PromptOptions extends StatusBarInputOptions {
   prefix: string;
   desc?: string;
   onClose: (value: string) => void;
@@ -949,7 +949,6 @@ export function showPrompt(adapter: EditorAdapter, options: PromptOptions) {
     onKeyDown: options.onKeyDown,
     onKeyUp: options.onKeyUp,
     onClose: options.onClose,
-    bottom: true,
     selectValueOnOpen: false,
     value: options.value,
   });

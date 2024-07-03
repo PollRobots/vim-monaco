@@ -3,7 +3,7 @@
  */
 import { IPosition, IRange, ISelection } from "monaco-editor";
 import monaco from "monaco-editor";
-import { SecInfoOptions, ModeChangeEvent } from "./statusbar";
+import { StatusBarInputOptions, ModeChangeEvent } from "./statusbar";
 import { ExCommandOptionalParameters } from "./keymap_vim";
 import { Pos, getEventKeyName, makePos } from "./common";
 
@@ -388,7 +388,7 @@ export default class EditorAdapter {
     signal: "status-prompt",
     prefix: string,
     desc: string,
-    options: SecInfoOptions,
+    options: StatusBarInputOptions,
     id: string
   ): void;
   dispatch(signal: "status-close-prompt", id: string): void;
@@ -420,7 +420,7 @@ export default class EditorAdapter {
     handler: (
       prefix: string,
       desc: string,
-      options: SecInfoOptions,
+      options: StatusBarInputOptions,
       id: string
     ) => void
   ): void;
@@ -1185,7 +1185,7 @@ export default class EditorAdapter {
   openPrompt(
     prefix: string,
     desc: string,
-    options: SecInfoOptions
+    options: StatusBarInputOptions
   ): () => void {
     const id = window.crypto.randomUUID();
     this.dispatch("status-prompt", prefix, desc, options, id);

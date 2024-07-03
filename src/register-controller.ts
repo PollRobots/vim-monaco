@@ -7,12 +7,27 @@ import {
 } from "./keymap_vim";
 
 export interface IRegister {
+  /** Indicates that the text was yanked linewise */
   readonly linewise: boolean;
+  /** Indicates that the text was yanked blockwise (all lines should be the same length) */
   readonly blockwise: boolean;
 
+  /** Sets the contents of the register */
   setText(text: string, linewise?: boolean, blockwise?: boolean): void;
+  /**
+   * Appends text to the register
+   * @param text
+   * @param linewise If this is `true` and the register is not currently
+   * linewise, then a `\n` should be appended to the previous contents prior to
+   * appending `text`
+   */
   pushText(text: string, linewise?: boolean): void;
+
+  /** The register should be reset */
   clear(): void;
+
+  /** Gets the text contents of the register. */
+  toString(): string;
 }
 
 /*

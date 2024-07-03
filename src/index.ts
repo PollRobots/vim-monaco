@@ -8,7 +8,7 @@ import { VimOptions } from "./types";
 export type IRegister = Registers.IRegister;
 export type IStatusBar = StatusBar.IStatusBar;
 export type ModeChangeEvent = StatusBar.ModeChangeEvent;
-export type SecInfoOptions = StatusBar.SecInfoOptions;
+export type StatusBarInputOptions = StatusBar.StatusBarInputOptions;
 
 declare global {
   interface Window {
@@ -99,7 +99,7 @@ export class VimMode implements EventTarget {
       });
 
       this.adapter_.on("status-display", (msg, id) => {
-        const closer = statusBar.setSecStatic(msg);
+        const closer = statusBar.startDisplay(msg);
         this.closers_.set(id, closer);
       });
 
@@ -112,7 +112,7 @@ export class VimMode implements EventTarget {
       });
 
       this.adapter_.on("status-prompt", (prefix, desc, options, id) => {
-        const closer = statusBar.setSecPrompt(prefix, desc, options);
+        const closer = statusBar.startPrompt(prefix, desc, options);
         this.closers_.set(id, closer);
       });
 
