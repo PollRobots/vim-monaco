@@ -317,8 +317,8 @@ export const actions: Record<string, ActionFunc> = {
       );
       let text = adapter.getRange(curStart, tmp);
       text = actionArgs.keepSpaces
-        ? text.replace(/\n\r?/g, "")
-        : text.replace(/\n\s*/g, " ");
+        ? text.replace(/\r?\n\r?/g, "")
+        : text.replace(/\r?\n\s*/g, " ");
       adapter.replaceRange(text, curStart, tmp);
     }
     const curFinalPos = makePos(curStart.line, finalCh);
