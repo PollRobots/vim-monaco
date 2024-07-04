@@ -6,6 +6,10 @@ vim mode for use with the [Monaco Editor](https://microsoft.github.io/monaco-edi
 
 **Note:** This package does not include the [monaco-editor](https://npmjs.org/package/monaco-editor). It requires that Monaco has already been loaded, and depends on `window.monaco` having been populated. See the `monaco-editor` readme for how to accomplish this.
 
+## Sample
+
+You can see this in use at [monaco-and-vim](https://pollrobots.com/monaco-and-vim), the code of which is at [github.com/pollrobots/monaco-and-vim](https://github.com/pollrobots/monaco-and-vim), and described in detail in this [blog article.](https://pollrobots.com/blog/typescript/vim/code/2024/07/03/monaco-and-vim.html)
+
 ### Basic Usage
 
 At a _minimum_ you can simply
