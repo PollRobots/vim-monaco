@@ -649,6 +649,9 @@ export const actions: Record<string, ActionFunc> = {
     adapter.indentLine(adapter.getCursor().line, actionArgs.indentRight);
   },
   exitInsertMode: exitInsertMode,
+  beginDigraph: function (adapter, actionArgs, vim) {
+    vim.insertDigraph = true;
+  },
 };
 
 export const defineAction = (name: string, fn: ActionFunc) =>

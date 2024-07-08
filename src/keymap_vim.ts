@@ -1886,6 +1886,7 @@ export function exitInsertMode(adapter: EditorAdapter) {
   }
   delete vim.insertModeRepeat;
   vim.insertMode = false;
+  vim.insertDigraph = undefined;
   adapter.setCursor(adapter.getCursor().line, adapter.getCursor().ch - 1);
   adapter.setOption("keyMap", "vim");
   adapter.setOption("disableInput", true);

@@ -40,6 +40,7 @@ export interface VimState {
   // Repeat count for changes made in insert mode, triggered by key
   // sequences like 3,i. Only exists when insertMode is true.
   insertModeRepeat?: number;
+  insertDigraph?: boolean;
   visualMode: boolean;
   // If we are in visual line mode. No effect if visualMode is false.
   visualLine: boolean;

@@ -771,6 +771,12 @@ export let defaultKeymap: KeyMapping[] = [
     actionArgs: { indentRight: false },
     context: "insert",
   },
+  {
+    keys: "<C-k>",
+    type: "action",
+    action: "beginDigraph",
+    context: "insert",
+  },
   // Text object motions
   { keys: "a<character>", type: "motion", motion: "textObjectManipulation" },
   {

@@ -1,7 +1,7 @@
 {
   "name": "vim-monaco",
   "type": "module",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "vim support for monaco-editor",
   "keywords": [
     "monaco-editor",
@@ -23,7 +23,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && microbundle",
+    "build": "npm run clean && npm run digraphs && microbundle",
+    "digraphs": "node src/digraph.src.js",
     "prepublishOnly": "npm run build"
   },
   "author": "Paul C Roberts <pacaro@gmail.com>",

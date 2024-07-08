@@ -33,6 +33,7 @@ import {
   MappableCommandType,
   MappableArgType,
 } from "./types";
+import { findDigraph } from "./digraph";
 
 export class VimApi {
   lastInsertModeKeyTimer?: ReturnType<typeof setTimeout>;
@@ -244,6 +245,27 @@ export class VimApi {
       }
       let keys = (vim.inputState.keyBuffer = vim.inputState.keyBuffer + key);
       const keysAreChars = key.length == 1;
+      if (vim.insertDigraph) {
+        if (!keysAreChars) {
+          clearInputState(adapter);
+          vim.insertDigraph = false;
+          return false;
+        }
+        if (keys.length < 2) {
+          return true;
+        }
+        const digraph = findDigraph(keys);
+        if (digraph == "") {
+          adapter.openNotification(`Unknown digraph: ${keys}`);
+        } else {
+          adapter.listSelections().forEach((sel) => {
+            adapter.replaceRange(digraph, sel.head);
+          });
+        }
+        clearInputState(adapter);
+        vim.insertDigraph = false;
+        return true;
+      }
       let match = commandDispatcher.matchCommand(
         keys,
         defaultKeymap,
