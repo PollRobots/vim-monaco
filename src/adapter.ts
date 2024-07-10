@@ -347,11 +347,27 @@ export default class EditorAdapter {
   setOption(key: string, value: string | number | boolean) {
     this.state[key] = value;
 
-    if (key === "theme") {
-      this.theme = value as string;
-      this.editor.updateOptions({
-        theme: this.theme,
-      });
+    switch (key) {
+      case "theme": {
+        this.theme = value as string;
+        this.editor.updateOptions({
+          theme: this.theme,
+        });
+      }
+      case "indentWithTabs": {
+        const model = this.editor.getModel()!;
+        model.updateOptions({ insertSpaces: !value });
+        break;
+      }
+      case "tabSize": {
+        const tabSize = typeof value === "number" ? value : Number(value);
+        if (isNaN(tabSize)) {
+          return;
+        }
+        const model = this.editor.getModel()!;
+        model.updateOptions({ tabSize: tabSize });
+        break;
+      }
     }
   }
 
@@ -373,8 +389,14 @@ export default class EditorAdapter {
         return this.getConfiguration().readOnly;
       case "firstLineNumber":
         return this.firstLine() + 1;
-      case "indentWithTabs":
-        return !this.getModel_().getOptions().insertSpaces;
+      case "indentWithTabs": {
+        const model = this.editor.getModel()!;
+        return !model.getOptions().insertSpaces;
+      }
+      case "tabSize": {
+        const model = this.editor.getModel()!;
+        return model.getOptions().tabSize;
+      }
       case "theme":
         if (this.theme) {
           return this.theme;
@@ -1121,9 +1143,8 @@ export default class EditorAdapter {
   }
 
   indentLine(line: number, indentRight: boolean = true) {
-    const opts = window.monaco.editor.EditorOption;
-    const useTabs = this.editor.getOption(opts.useTabStops);
-    const tabWidth = this.editor.getOption(opts.tabIndex);
+    const useTabs = !!this.getOption("indentWithTabs");
+    const tabWidth = Number(this.getOption("tabSize"));
     const spaces = "".padEnd(tabWidth, " ");
 
     if (indentRight) {

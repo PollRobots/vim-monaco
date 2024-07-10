@@ -2326,4 +2326,38 @@ defineOption(
   }
 );
 
+defineOption("expandtab", undefined, "boolean", ["et"], (value, adapter) => {
+  if (value === undefined) {
+    if (adapter) {
+      return !adapter.getOption("indentWithTabs");
+    }
+  } else if (adapter) {
+    adapter.setOption("indentWithTabs", !value);
+    return !!value;
+  }
+  return false;
+});
+
+defineOption("tabstop", undefined, "number", ["ts"], (value, adapter) => {
+  if (value === undefined) {
+    if (adapter) {
+      const current = adapter.getOption("tabSize");
+      if (typeof current === "number") {
+        return current;
+      } else if (!isNaN(Number(current))) {
+        return Number(current);
+      }
+    }
+  } else if (adapter) {
+    if (typeof value !== "number") {
+      value = Number(value);
+    }
+    if (!isNaN(value)) {
+      adapter.setOption("tabSize", value);
+      return value;
+    }
+  }
+  return 8;
+});
+
 export const vimApi = new VimApi();
