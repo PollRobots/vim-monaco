@@ -1159,7 +1159,7 @@ export default class EditorAdapter {
     } else {
       const model = this.getModel_();
 
-      const range = makeRange(line + 1, 1, line + 1, tabWidth);
+      const range = makeRange(line + 1, 1, line + 1, tabWidth + 1);
       const begin = model.getValueInRange(range);
 
       const edit: monaco.editor.IIdentifiedSingleEditOperation = {
