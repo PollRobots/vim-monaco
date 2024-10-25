@@ -1,7 +1,7 @@
 {
   "name": "vim-monaco",
   "type": "module",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "vim support for monaco-editor",
   "keywords": [
     "monaco-editor",
