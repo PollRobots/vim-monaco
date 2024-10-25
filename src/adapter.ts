@@ -1023,7 +1023,7 @@ export default class EditorAdapter {
       },
     }));
     const previous = this.decorations.get(className);
-    if (previous) {
+    if (previous && previous.append) {
       previous.append(decorations);
     } else {
       const collection = this.editor.createDecorationsCollection(decorations);
