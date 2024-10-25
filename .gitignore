@@ -2,3 +2,4 @@ node_modules
 dist
 
 digraph.b64.ts
+version.ts

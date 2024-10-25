@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
+    "prebuild": "node src/build.js",
     "build": "npm run clean && npm run digraphs && microbundle",
     "digraphs": "node src/digraph.src.js",
     "prepublishOnly": "npm run build"

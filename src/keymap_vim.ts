@@ -76,6 +76,7 @@ import {
   SearchArgs,
   ExArgs,
 } from "./types";
+import { PACKAGE_INFO } from "./version";
 
 function enterVimMode(adapter: EditorAdapter) {
   adapter.setOption("disableInput", true);
@@ -1613,6 +1614,23 @@ export const exCommands: Record<string, ExCommandFunc> = {
       // If a save command is defined, call it.
       EditorAdapter.commands.save(adapter, params);
     }
+  },
+  version: function (adapter) {
+    const versionInfo: string[] = [];
+    versionInfo.push(
+      `${PACKAGE_INFO.name} v${
+        PACKAGE_INFO.version
+      } (${PACKAGE_INFO.commitDate.toLocaleDateString()}, built ${PACKAGE_INFO.buildDate.toLocaleString()})`
+    );
+    versionInfo.push(``);
+    versionInfo.push(`Repository: ${PACKAGE_INFO.repo}`);
+    versionInfo.push(`Author: ${PACKAGE_INFO.author}`);
+    versionInfo.push(
+      `Commit: ${PACKAGE_INFO.commit}${
+        PACKAGE_INFO.clean ? "" : " (development build)"
+      }`
+    );
+    showConfirm(adapter, versionInfo.join("\n"));
   },
   write: function (adapter, params) {
     if (EditorAdapter.commands.save) {

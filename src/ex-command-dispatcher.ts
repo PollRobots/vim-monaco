@@ -42,6 +42,7 @@ const defaultExCommandMap: ExCommand[] = [
   { name: "registers", shortName: "reg", excludeFromCommandHistory: true },
   { name: "vglobal", shortName: "v" },
   { name: "global", shortName: "g" },
+  { name: "version", shortName: "ve" },
 ];
 
 export class ExCommandDispatcher {
