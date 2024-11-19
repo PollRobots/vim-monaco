@@ -37,10 +37,10 @@
   "license": "MIT",
   "devDependencies": {
     "microbundle": "^0.15.1",
-    "monaco-editor": "^0.50.0",
+    "monaco-editor": ">=0.50.0 <0.53.0",
     "typescript": "^5.5.3"
   },
   "peerDependencies": {
-    "monaco-editor": "^0.50.0"
+    "monaco-editor": ">=0.50.0 <0.53.0"
   }
 }
